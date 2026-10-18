@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* ── Custom Fonts ── */
+@font-face {
+  font-family: 'Lifta';
+  src: url('/fonts/Lifta.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Avengeance';
+  src: url('/fonts/Avengeance.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #06061a;
+  --burgundy: #800020;
+  --burgundy-light: #a0002a;
+  --blue-discord: #5865f2;
+  --white: #ffffff;
+  --muted: #aaaaaa;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #06061a; }
+::-webkit-scrollbar-thumb { background: #800020; border-radius: 3px; }
+
+/* ── Glow / Shadow helpers ── */
+.text-shadow-nav {
+  text-shadow: 138deg 4px 8px rgba(0,0,0,0.8);
+}
+
+.glow-burgundy {
+  text-shadow:
+    0 0 8px rgba(128,0,32,0.9),
+    0 0 20px rgba(128,0,32,0.6),
+    0 0 40px rgba(128,0,32,0.3);
+}
+
+.shadow-btn {
+  filter: drop-shadow(8px 6px 6px rgba(0,0,0,0.75));
+}
+
+.hero-text-shadow {
+  text-shadow:
+    4px 6px 10px rgba(0,0,0,0.9),
+    0 0 30px rgba(30,30,80,0.5);
+}
+
+.desc-shadow {
+  text-shadow: 3px 5px 8px rgba(0,0,0,0.85);
+}
