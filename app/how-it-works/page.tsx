@@ -372,7 +372,7 @@ export default function HowItWorksPage() {
         {/* ── CTA BUTTON ── */}
         <div className="mt-14 mb-8 flex flex-col items-center">
           <Link
-            href="/tool"
+            href="/"
             className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95"
           >
             <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#5865F2] via-[#7289da] to-[#4752c4] opacity-80 blur-sm transition-all duration-300 group-hover:opacity-100 group-hover:blur-md" />
@@ -387,11 +387,22 @@ export default function HowItWorksPage() {
                 textShadow: "0 2px 8px rgba(0,0,0,0.5)",
               }}
             >
-              ابدأ الآن
+              العودة للرئيسية
             </span>
           </Link>
         </div>
       </div>
+
+      {/* ── FOOTER ── */}
+      <footer
+        className="w-full text-center py-6 select-none border-t border-white/5 mt-10"
+        style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+      >
+        <p className="text-[12px] md:text-[13px] text-white/50 tracking-wider">
+          Copyrights © Quester | 2026. All rights reserved. made by{" "}
+          <span className="text-[#5865F2] font-semibold">Jio</span>
+        </p>
+      </footer>
     </main>
   );
 }

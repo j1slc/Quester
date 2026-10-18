@@ -214,6 +214,17 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* ── FOOTER ── */}
+      <footer
+        className="absolute bottom-4 left-0 right-0 text-center select-none"
+        style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+      >
+        <p className="text-[12px] md:text-[13px] text-white/50 tracking-wider">
+          Copyrights © Quester | 2026. All rights reserved. made by{" "}
+          <span className="text-[#5865F2] font-semibold">Jio</span>
+        </p>
+      </footer>
     </main>
   );
 }
