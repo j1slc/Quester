@@ -380,8 +380,8 @@ export default function ToolPage() {
             dir="rtl"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-[#5865F2]/20 border border-[#5865F2]/40 flex items-center justify-center text-2xl">
-                🔑
+              <div className="w-12 h-12 rounded-2xl bg-[#5865F2]/20 border border-[#5865F2]/40 flex items-center justify-center overflow-hidden">
+                <img src="/hashtag.png" alt="token" className="w-8 h-8 object-contain" />
               </div>
               <div>
                 <h2 className="text-xl font-bold" style={{ fontFamily: "'Lifta', sans-serif" }}>
@@ -395,21 +395,25 @@ export default function ToolPage() {
               <label className="block text-xs text-gray-300 mb-2 font-semibold">
                 التوكن الخاص بحسابك:
               </label>
-              <div className="relative">
+              <div className="flex items-center gap-3">
                 <input
                   type={showToken ? "text" : "password"}
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  placeholder="MTM..."
-                  className="w-full px-4 py-3.5 pr-4 pl-12 rounded-2xl bg-black/40 border border-white/15 text-white placeholder-gray-500 focus:outline-none focus:border-[#5865F2] focus:ring-2 focus:ring-[#5865F2]/40 text-sm font-mono tracking-wider transition-all"
+                  placeholder=""
+                  className="flex-1 px-4 py-3.5 rounded-2xl bg-black/40 border border-white/15 text-white placeholder-gray-500 focus:outline-none focus:border-[#5865F2] focus:ring-2 focus:ring-[#5865F2]/40 text-sm font-mono tracking-wider transition-all"
                   dir="ltr"
                 />
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors cursor-pointer text-sm"
+                  className="cursor-pointer transition-opacity hover:opacity-80 shrink-0"
                 >
-                  {showToken ? "إخفاء" : "إظهار"}
+                  <img
+                    src={showToken ? "/switch_enabled.png" : "/switch_disabled.png"}
+                    alt={showToken ? "إخفاء" : "إظهار"}
+                    className="w-12 h-7 object-contain"
+                  />
                 </button>
               </div>
             </div>
@@ -489,6 +493,12 @@ export default function ToolPage() {
                   className="px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs md:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2"
                 >
                   <span>تحديث المهام</span>
+                  <img
+                    src="/refresh.png"
+                    alt="refresh"
+                    className={`w-4 h-4 object-contain shrink-0 ${loadingQuests ? "animate-spin" : ""}`}
+                    style={{ filter: "brightness(0) saturate(100%) invert(38%) sepia(74%) saturate(4425%) hue-rotate(222deg) brightness(98%) contrast(91%)" }}
+                  />
                 </button>
 
                 <button
