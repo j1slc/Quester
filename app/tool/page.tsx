@@ -312,14 +312,6 @@ export default function ToolPage() {
           className="flex items-center gap-6 text-base md:text-lg"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
-          {/* ستريم */}
-          <Link
-            href="/stream"
-            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
-          >
-            ستريم
-          </Link>
-          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
             href="/how-it-works"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
