@@ -191,3 +191,25 @@ export async function enrollUserInQuest(token: string, questId: string): Promise
     return false;
   }
 }
+
+export interface DiscordChannelInfo {
+  id: string;
+  guild_id?: string;
+  name: string;
+  type: number;
+}
+
+export async function fetchDiscordChannel(
+  token: string,
+  channelId: string
+): Promise<DiscordChannelInfo | null> {
+  try {
+    const client = createDiscordClient(token);
+    const { data } = await client.get<DiscordChannelInfo>(`/channels/${channelId}`);
+    if (data?.id) return data;
+    return null;
+  } catch (err) {
+    return null;
+  }
+}
+
