@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 interface FAQItem {
   question: string;
@@ -58,6 +57,17 @@ export default function FAQPage() {
           className="flex items-center gap-6"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
+          {/* الرئيسية */}
+          <Link
+            href="/"
+            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            الرئيسية
+          </Link>
+
+          {/* separator */}
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
+
           {/* كيف يعمل */}
           <Link
             href="/how-it-works"
@@ -78,20 +88,6 @@ export default function FAQPage() {
             أسئلة شائعة
           </Link>
         </div>
-
-        {/* Logo — أقصى اليمين موازي تماماً لخط الروابط */}
-        <Link
-          href="/"
-          className="absolute right-6 md:right-10 top-1/2 -translate-y-1/2 w-28 h-28 md:w-36 md:h-36 transition-transform duration-200 hover:scale-105 active:scale-95"
-        >
-          <Image
-            src="/logo.png"
-            alt="Quester Logo"
-            fill
-            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.75)]"
-            priority
-          />
-        </Link>
       </nav>
 
       {/* ── CONTENT CONTAINER ── */}
@@ -117,7 +113,13 @@ export default function FAQPage() {
           }}
         >
           إليك كل ما تحتاج لمعرفته حول استخدام{" "}
-          <span style={{ color: "#5865f2", fontWeight: 700 }}>Quester</span>
+          <Link
+            href="/"
+            className="transition-colors duration-200 hover:brightness-125 hover:underline"
+            style={{ color: "#5865f2", fontWeight: 700 }}
+          >
+            Quester
+          </Link>
           {" "}وكيفية تشغيل مهام الديسكورد بكل أمان وسهولة.
         </p>
 

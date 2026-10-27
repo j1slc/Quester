@@ -1,18 +1,6 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 
 export default function HomePage() {
-  const [showModal, setShowModal] = useState(false);
-  const [clicked, setClicked] = useState(false);
-
-  const handleClick = () => {
-    setClicked(true);
-    setShowModal(true);
-  };
-
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
@@ -44,20 +32,6 @@ export default function HomePage() {
             أسئلة شائعة
           </Link>
         </div>
-
-        {/* Logo — أقصى اليمين موازي تماماً لخط الروابط */}
-        <Link
-          href="/"
-          className="absolute right-6 md:right-10 top-1/2 -translate-y-1/2 w-28 h-28 md:w-36 md:h-36 transition-transform duration-200 hover:scale-105 active:scale-95"
-        >
-          <Image
-            src="/logo.png"
-            alt="Quester Logo"
-            fill
-            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.75)]"
-            priority
-          />
-        </Link>
       </nav>
 
       {/* ── HERO CONTENT ── */}
@@ -115,10 +89,9 @@ export default function HomePage() {
           ابدأ الآن، ماذا تنتظر؟
         </p>
 
-        {/* CTA Button */}
-        <button
-          onClick={handleClick}
-          type="button"
+        {/* CTA Button — Links directly to /tool */}
+        <Link
+          href="/tool"
           className="group relative mt-7 inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
         >
           {/* Glowing animated border/backdrop */}
@@ -138,82 +111,8 @@ export default function HomePage() {
           >
             اضغط هُنا
           </span>
-        </button>
-
-        {/* Under Construction Notice below button if clicked */}
-        {clicked && (
-          <div
-            className="mt-6 inline-flex items-center gap-2.5 px-6 py-2.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 text-sm font-semibold animate-pulse shadow-lg"
-            style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-          >
-            <span>🚧</span>
-            <span>الموقع تحت الإنشاء والتطوير حالياً... انتظرونا قريباً!</span>
-          </div>
-        )}
+        </Link>
       </div>
-
-      {/* ── POPUP MODAL (تحت الإنشاء / قريباً) ── */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-opacity duration-300"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="relative w-full max-w-md rounded-3xl p-8 border border-white/15 text-center text-white shadow-2xl overflow-hidden transform transition-all duration-300 scale-100"
-            style={{
-              background: "radial-gradient(circle at 50% 20%, #202058 0%, #0c0c24 100%)",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(88, 101, 242, 0.25)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Ambient top light */}
-            <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-32 bg-[#5865F2] opacity-30 blur-3xl pointer-events-none" />
-
-            {/* Icon */}
-            <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-4xl shadow-inner">
-              🚧
-            </div>
-
-            {/* Tag */}
-            <span
-              className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 mb-3"
-              style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-            >
-              قريباً جداً · Coming Soon
-            </span>
-
-            {/* Title */}
-            <h3
-              className="text-2xl md:text-3xl font-bold mb-3 text-white"
-              style={{ fontFamily: "'Lifta', sans-serif" }}
-            >
-              الموقع تحت الإنشاء
-            </h3>
-
-            {/* Body */}
-            <p
-              className="text-gray-300 text-sm md:text-base leading-relaxed mb-6"
-              style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-            >
-              نعمل حالياً على تطوير وتجهيز المنصة بأعلى معايير السرعة والأمان لتوفير تجربة استثنائية لكم.
-              <br />
-              <strong className="text-white mt-1 inline-block">ترقبوا الإطلاق الرسمي قريباً! 🚀</strong>
-            </p>
-
-            {/* Close Button */}
-            <button
-              onClick={() => setShowModal(false)}
-              className="w-full py-3.5 rounded-2xl font-bold text-base text-white transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg shadow-[#5865F2]/40"
-              style={{
-                fontFamily: "'Lifta', sans-serif",
-                background: "linear-gradient(135deg, #5865F2 0%, #3c45a5 100%)",
-              }}
-            >
-              حسناً، فهمت
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── FOOTER ── */}
       <footer
