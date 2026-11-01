@@ -24,6 +24,17 @@ export default function HomePage() {
           {/* separator */}
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
+          {/* ويدجيت */}
+          <Link
+            href="/widget"
+            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            ويدجيت
+          </Link>
+
+          {/* separator */}
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
+
           {/* أسئلة شائعة */}
           <Link
             href="/faq"
@@ -89,7 +100,7 @@ export default function HomePage() {
           ابدأ الآن، ماذا تنتظر؟
         </p>
 
-        {/* CTA Button — Links directly to /tool */}
+        {/* CTA Button — Single button to /tool */}
         <Link
           href="/tool"
           className="group relative mt-7 inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"

@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "M.I.R.A Widget",
+  "version": "2.0.0",
+  "description": "Premium Modular Identity & Reality Automation profile widget configurator by meeer.",
+  "icons": {
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "permissions": [
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://discord.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://discord.com/developers/*"
+      ],
+      "js": [
+        "widget-creator.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://discord.com/developers/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

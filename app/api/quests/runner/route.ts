@@ -1,5 +1,57 @@
 import { createDiscordClient, enrollUserInQuest } from "@/lib/discord/client";
 
+function extractProgressFromData(data: any, taskType: string): { current: number | null; completed: boolean } {
+  if (!data) return { current: null, completed: false };
+
+  const userStatus = data.user_status || data;
+  const progressObj = userStatus.progress || data.progress;
+  let current: number | null = null;
+  let completed = Boolean(userStatus.completed_at || data.completed_at);
+
+  if (progressObj && typeof progressObj === "object") {
+    const taskProg = progressObj[taskType] || Object.values(progressObj)[0];
+    if (typeof taskProg === "number") {
+      current = taskProg;
+    } else if (taskProg && typeof taskProg === "object") {
+      if (typeof taskProg.value === "number") {
+        current = taskProg.value;
+      }
+      if (taskProg.completed_at) {
+        completed = true;
+      }
+    }
+  }
+
+  if (current === null) {
+    if (typeof userStatus.stream_progress_seconds === "number" && userStatus.stream_progress_seconds > 0) {
+      current = userStatus.stream_progress_seconds;
+    } else if (typeof data.stream_progress_seconds === "number" && data.stream_progress_seconds > 0) {
+      current = data.stream_progress_seconds;
+    } else if (typeof userStatus.streamProgressSeconds === "number" && userStatus.streamProgressSeconds > 0) {
+      current = userStatus.streamProgressSeconds;
+    } else if (typeof data.streamProgressSeconds === "number" && data.streamProgressSeconds > 0) {
+      current = data.streamProgressSeconds;
+    }
+  }
+
+  return { current, completed };
+}
+
+// Build the correct heartbeat body depending on task type
+function buildHeartbeatBody(taskType: string, questId: string, terminal = false) {
+  const isActivity = taskType === "PLAY_ACTIVITY";
+  const isStream = taskType === "STREAM_ON_DESKTOP";
+
+  if (isActivity || isStream) {
+    return {
+      stream_key: `call:${questId}:1`,
+      terminal,
+    };
+  }
+
+  // PLAY_ON_DESKTOP and similar — no stream_key needed
+  return { terminal };
+}
 
 export async function POST(req: Request) {
   const { token, questId, taskType = "PLAY_ON_DESKTOP", target = 900, current = 0 } = await req.json();
@@ -31,17 +83,57 @@ export async function POST(req: Request) {
       try {
         sendEvent("log", { message: "بدء تهيئة المهمة والاتصال بخوادم ديسكورد..." });
 
-        // Ensure user is enrolled
+        const client = createDiscordClient(token);
+
+        // Step 1: verify quest exists and check enrollment
+        let isEnrolled = false;
         try {
-          await enrollUserInQuest(token, questId);
-          sendEvent("log", { message: "تم تأكيد التسجيل في المهمة (Enrolled)." });
-        } catch (e) {
-          // May already be enrolled
+          const meRes = await client.get("/quests/@me");
+          const foundQuest = meRes.data?.quests?.find((q: any) => q.id === questId);
+          if (foundQuest?.user_status?.enrolled_at) {
+            isEnrolled = true;
+            sendEvent("log", { message: "المستخدم مسجّل بالفعل في المهمة ✅" });
+          }
+        } catch (e) {}
+
+        // Step 2: enroll if not enrolled
+        if (!isEnrolled) {
+          sendEvent("log", { message: "جاري التسجيل في المهمة..." });
+          let enrollResult = await enrollUserInQuest(token, questId);
+
+          // If rate limited on enroll, wait for retry_after and retry once automatically
+          if (!enrollResult.success && enrollResult.retryAfter) {
+            const waitSec = Math.min(15, enrollResult.retryAfter);
+            sendEvent("log", {
+              message: `⏳ ديسكورد فرض مهلة انتظار (${waitSec} ثوانٍ)، جاري الانتظار والمحاولة مجدداً تلقائياً...`,
+            });
+            await new Promise((r) => setTimeout(r, (waitSec + 1) * 1000));
+            enrollResult = await enrollUserInQuest(token, questId);
+          }
+
+          if (enrollResult.success) {
+            isEnrolled = true;
+            sendEvent("log", {
+              message: enrollResult.alreadyEnrolled
+                ? "المستخدم مسجّل بالفعل ✅"
+                : "تم التسجيل في المهمة بنجاح ✅",
+            });
+          } else {
+            sendEvent("log", {
+              message: `⚠️ فشل التسجيل: ${enrollResult.error || "غير معروف"}`,
+            });
+          }
         }
 
-        const client = createDiscordClient(token);
+        if (!isEnrolled) {
+          sendEvent("error", {
+            message: "❌ الحساب واجه Rate Limit من ديسكورد، أو لم يقبل المهمة. افتح ديسكورد واضغط Accept على المهمة يدوياً، أو انتظر دقيقة وأعد المحاولة.",
+          });
+          return;
+        }
+
         const isVideoTask = taskType === "WATCH_VIDEO" || taskType === "WATCH_VIDEO_ON_MOBILE";
-        const intervalMs = isVideoTask ? 5000 : 30000;
+        const intervalMs = isVideoTask ? 5000 : 20000;
 
         let curProgress = Number(current) || 0;
         const targetSeconds = Number(target) || 900;
@@ -49,6 +141,15 @@ export async function POST(req: Request) {
 
         sendEvent("log", {
           message: `نوع المهمة: ${taskType} | الهدف: ${Math.round(targetSeconds / 60)} دقيقة`,
+        });
+
+        // Send initial progress immediately
+        const initialPercent = targetSeconds > 0 ? Math.min(100, Math.floor((curProgress / targetSeconds) * 100)) : 0;
+        sendEvent("progress", {
+          current: curProgress,
+          target: targetSeconds,
+          percent: initialPercent,
+          completed: curProgress >= targetSeconds,
         });
 
         while (!isAborted) {
@@ -62,76 +163,87 @@ export async function POST(req: Request) {
               });
               responseData = res.data;
             } else {
-              // Desktop / Activity / Stream
-              const res = await client.post(`/quests/${questId}/heartbeat`, {
-                stream_key: `call:${questId}:1`,
-                terminal: false,
-              });
+              const isCompleting = curProgress + 20 >= targetSeconds;
+              const body = buildHeartbeatBody(taskType, questId, isCompleting);
+              const res = await client.post(`/quests/${questId}/heartbeat`, body);
               responseData = res.data;
             }
           } catch (err: any) {
-            const errorMsg =
-              err.response?.data?.message || err.message || "فشل إرسال نبضة التقدم";
+            const status = err.response?.status;
+            const errorMsg = err.response?.data?.message || err.message || "فشل إرسال نبضة التقدم";
+
+            if (status === 403 || (errorMsg as string).toLowerCase().includes("not enrolled")) {
+              sendEvent("error", {
+                message: "❌ الحساب غير مسجّل في المهمة. افتح Discord وقبل المهمة يدوياً ثم حاول مجدداً.",
+              });
+              break;
+            }
             sendEvent("log", { message: `تحذير: ${errorMsg}` });
           }
 
-          if (responseData) {
-            const taskProgress =
-              responseData?.user_status?.progress?.[taskType] ||
-              responseData?.user_status?.progress?.[Object.keys(responseData?.user_status?.progress || {})[0]];
+          let extracted = extractProgressFromData(responseData, taskType);
 
-            if (taskProgress) {
-              curProgress = taskProgress.value ?? curProgress;
-              const isCompleted =
-                Boolean(taskProgress.completed_at) || curProgress >= targetSeconds;
-              const percent = Math.min(
-                100,
-                Math.floor((curProgress / targetSeconds) * 100)
-              );
-
-              sendEvent("progress", {
-                current: curProgress,
-                target: targetSeconds,
-                percent,
-                completed: isCompleted,
-              });
-
-              sendEvent("log", {
-                message: `[تحديث] التقدم الحالي: ${curProgress} ثانية من ${targetSeconds} (${percent}%)`,
-              });
-
-              if (isCompleted) {
-                sendEvent("completed", {
-                  message: "🎉 ألف مبروك! اكتملت المهمة بنجاح، وتمت إضافة الجائزة إلى حسابك!",
-                });
-                break;
+          // Fallback: fetch fresh data from Discord if POST response had no progress
+          if (extracted.current === null) {
+            try {
+              const meRes = await client.get("/quests/@me");
+              const foundQuest = meRes.data?.quests?.find((q: any) => q.id === questId);
+              if (foundQuest?.user_status) {
+                const fresh = extractProgressFromData(foundQuest.user_status, taskType);
+                if (fresh.current !== null) {
+                  extracted = fresh;
+                }
               }
-            } else {
-              // Fallback simulated increment if Discord delay
-              curProgress += isVideoTask ? 5 : 30;
-              const percent = Math.min(
-                100,
-                Math.floor((curProgress / targetSeconds) * 100)
-              );
-              sendEvent("progress", {
-                current: curProgress,
-                target: targetSeconds,
-                percent,
-                completed: curProgress >= targetSeconds,
+            } catch (e) {}
+          }
+
+          if (extracted.current !== null) {
+            curProgress = extracted.current;
+            const isCompleted = extracted.completed || curProgress >= targetSeconds;
+            const percent = isCompleted ? 100 : Math.min(100, Math.floor((curProgress / targetSeconds) * 100));
+
+            sendEvent("progress", {
+              current: curProgress,
+              target: targetSeconds,
+              percent,
+              completed: isCompleted,
+            });
+
+            sendEvent("log", {
+              message: `[Discord] التقدم الفعلي: ${curProgress}s / ${targetSeconds}s (${percent}%)`,
+            });
+
+            if (isCompleted) {
+              sendEvent("completed", {
+                message: "🎉 ألف مبروك! اكتملت المهمة بنجاح، وتمت إضافة الجائزة إلى حسابك!",
               });
-              sendEvent("log", {
-                message: `[نبض] جاري المحاكاة: ${curProgress} / ${targetSeconds} ثانية (${percent}%)`,
+              break;
+            }
+          } else {
+            // Fallback increment (server unreachable)
+            curProgress += isVideoTask ? 5 : 20;
+            const isCompleted = curProgress >= targetSeconds;
+            const percent = Math.min(100, Math.floor((curProgress / targetSeconds) * 100));
+
+            sendEvent("progress", {
+              current: curProgress,
+              target: targetSeconds,
+              percent,
+              completed: isCompleted,
+            });
+
+            sendEvent("log", {
+              message: `[محاكاة] التقدم: ${curProgress}s / ${targetSeconds}s (${percent}%)`,
+            });
+
+            if (isCompleted) {
+              sendEvent("completed", {
+                message: "🎉 تم الوصول للهدف!",
               });
-              if (curProgress >= targetSeconds) {
-                sendEvent("completed", {
-                  message: "🎉 تم الوصول للهدف! تم إكمال المهمة بنجاح!",
-                });
-                break;
-              }
+              break;
             }
           }
 
-          // Delay interval
           await new Promise((resolve) => setTimeout(resolve, intervalMs));
         }
       } catch (err: any) {

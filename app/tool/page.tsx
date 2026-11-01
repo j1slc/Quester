@@ -63,11 +63,31 @@ export default function ToolPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const isRunningRef = useRef<boolean>(false);
+  const pendingAutoStartRef = useRef<ParsedQuest | null>(null);
+  const questsRef = useRef<ParsedQuest[]>([]);
 
   // Auto scroll logs
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
+  // Real-time second-by-second ticker while running
+  useEffect(() => {
+    if (!isRunning || isCompleted) return;
+
+    const timer = setInterval(() => {
+      setCurrentProgress((prev) => {
+        if (targetSeconds <= 0) return prev;
+        const next = Math.min(targetSeconds, prev + 1);
+        const nextPercent = Math.min(100, Math.floor((next / targetSeconds) * 100));
+        setProgressPercent(nextPercent);
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isRunning, isCompleted, targetSeconds]);
 
   // Load token on mount if saved
   useEffect(() => {
@@ -110,7 +130,7 @@ export default function ToolPage() {
       addLog(`تم تسجيل الدخول بنجاح بحساب: ${data.user.global_name || data.user.username}`);
 
       // Fetch Quests
-      await loadQuests(tokenToUse.trim());
+      await loadQuests(tokenToUse.trim(), { autoStart: true });
     } catch (err: any) {
       setErrorMsg(err.message || "حدث خطأ أثناء فحص التوكن");
       setUser(null);
@@ -119,7 +139,7 @@ export default function ToolPage() {
     }
   };
 
-  const loadQuests = async (tokenStr: string) => {
+  const loadQuests = async (tokenStr: string, opts?: { autoStart?: boolean }) => {
     setLoadingQuests(true);
     try {
       const res = await fetch("/api/quests/list", {
@@ -129,10 +149,23 @@ export default function ToolPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        questsRef.current = data.quests;
         setQuests(data.quests);
         const uncompleted = data.quests.find((q: ParsedQuest) => !q.isCompleted);
         const firstToSelect = uncompleted || data.quests[0];
-        if (data.quests.length > 0 && !selectedQuest) {
+        if (selectedQuest) {
+          const updated = data.quests.find((q: ParsedQuest) => q.id === selectedQuest.id);
+          if (updated) {
+            setSelectedQuest(updated);
+            if (!isRunningRef.current) {
+              const mainTask = updated.tasks[0];
+              setCurrentProgress(mainTask?.current || 0);
+              setTargetSeconds(mainTask?.target || 900);
+              setProgressPercent(updated.overallPercent || 0);
+              setIsCompleted(updated.isCompleted);
+            }
+          }
+        } else if (data.quests.length > 0) {
           setSelectedQuest(firstToSelect);
           setCurrentProgress(firstToSelect.tasks[0]?.current || 0);
           setTargetSeconds(firstToSelect.tasks[0]?.target || 900);
@@ -140,6 +173,11 @@ export default function ToolPage() {
           setIsCompleted(firstToSelect.isCompleted);
         }
         addLog(`تم العثور على ${data.quests.length} مهمة في حسابك`);
+
+        // Auto start the first uncompleted quest if requested (e.g. right after login)
+        if (opts?.autoStart && data.quests.length > 0 && !isRunningRef.current && !firstToSelect.isCompleted) {
+          startRunner(firstToSelect);
+        }
       }
     } catch (err: any) {
       addLog(`فشل جلب المهام: ${err.message}`);
@@ -170,19 +208,29 @@ export default function ToolPage() {
     addLog(`تم اختيار مهمة: ${q.title}`);
   };
 
-  const startRunner = async () => {
-    if (!selectedQuest || !token || isRunning) return;
+  const startRunner = async (questOverride?: ParsedQuest | null) => {
+    const quest = questOverride || selectedQuest;
+    if (!quest || !token || isRunningRef.current) return;
 
+    isRunningRef.current = true;
     setIsRunning(true);
+    setSelectedQuest(quest);
     setIsCompleted(false);
     setErrorMsg(null);
-    addLog(`🚀 جاري بدء تشغيل مهمة: ${selectedQuest.title}`);
+    addLog(`🚀 جاري بدء تشغيل مهمة: ${quest.title}`);
 
-    const mainTask = selectedQuest.tasks[0] || {
+    const mainTask = quest.tasks[0] || {
       id: "PLAY_ON_DESKTOP",
       target: 900,
       current: 0,
     };
+
+    const initialPercent = mainTask.target > 0
+      ? Math.min(100, Math.floor(((mainTask.current || 0) / mainTask.target) * 100))
+      : (quest.overallPercent || 0);
+    setCurrentProgress(mainTask.current || 0);
+    setTargetSeconds(mainTask.target || 900);
+    setProgressPercent(initialPercent);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -193,7 +241,7 @@ export default function ToolPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: token.trim(),
-          questId: selectedQuest.id,
+          questId: quest.id,
           taskType: mainTask.id,
           target: mainTask.target,
           current: mainTask.current,
@@ -241,8 +289,16 @@ export default function ToolPage() {
             }
           } else if (eventType === "completed") {
             setIsCompleted(true);
-            setIsRunning(false);
             addLog(dataObj.message || "🎉 اكتملت المهمة بنجاح!");
+
+            // Auto start the next quest when one is available
+            const nextQuest =
+              questsRef.current.find((q) => !q.isCompleted && q.id !== quest.id) ||
+              questsRef.current.find((q) => !q.isCompleted);
+            if (nextQuest && nextQuest.id !== quest.id) {
+              pendingAutoStartRef.current = nextQuest;
+            }
+
             // Refresh list
             loadQuests(token.trim());
           } else if (eventType === "error") {
@@ -259,8 +315,15 @@ export default function ToolPage() {
         addLog("تم إيقاف تشغيل المهمة يدوياً.");
       }
     } finally {
+      // Auto start the next quest if one was queued after completion
+      const nextToRun = pendingAutoStartRef.current;
+      pendingAutoStartRef.current = null;
+      isRunningRef.current = false;
       setIsRunning(false);
       abortControllerRef.current = null;
+      if (nextToRun) {
+        startRunner(nextToRun);
+      }
     }
   };
 
@@ -269,6 +332,7 @@ export default function ToolPage() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    isRunningRef.current = false;
     setIsRunning(false);
     addLog("تم إيقاف العملية.");
   };
@@ -317,6 +381,13 @@ export default function ToolPage() {
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             كيف يعمل
+          </Link>
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
+          <Link
+            href="/widget"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            ويدجيت
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
@@ -734,7 +805,7 @@ export default function ToolPage() {
                 <div className="flex flex-wrap items-center gap-4 mb-8">
                   {!isRunning ? (
                     <button
-                      onClick={startRunner}
+                      onClick={() => startRunner()}
                       disabled={isCompleted}
                       className="flex-1 py-4 px-8 rounded-2xl font-bold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 cursor-pointer shadow-xl shadow-[#5865F2]/40 flex items-center justify-center gap-2 text-lg"
                       style={{

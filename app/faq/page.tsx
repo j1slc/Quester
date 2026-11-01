@@ -15,6 +15,11 @@ const faqs: FAQItem[] = [
       "هو أداة متطورة تمكنك من إتمام جميع مهمات (Quests) الديسكورد وتجميع المكافآت والشارات الحصرية تلقائياً وبسهولة تامة بدون الحاجة لتحميل الألعاب أو قضاء ساعات في اللعب.",
   },
   {
+    question: "ما هو صانع الويدجيت (Widget Maker)؟",
+    answer:
+      "أداة مخصصة لإنشاء ويدجيتس البروفايل التفاعلية في ديسكورد (Bento Board)، تتيح لك تخصيص بطاقات لعرض إحصائيات سيرفراتك، وحالة حسابك، وروابطك وشاراتك بستايل عصري وجذاب وتطبيقها على حسابك.",
+  },
+  {
     question: "هل استخدام البوت آمن على حسابي؟",
     answer:
       "نعم، البوت يحاكي عملية اللعب الطبيعية وبث الديسكورد المعتمدة من قِبل التطبيق، ولا يطلب كلمة السر لحسابك إطلاقاً، كما يتم تشغيل المهام في بيئة محلية ومحمية.",
@@ -45,14 +50,13 @@ export default function FAQPage() {
 
   return (
     <main
-      className="min-h-screen flex flex-col items-center justify-start relative overflow-x-hidden pb-20"
+      className="min-h-screen flex flex-col items-center relative overflow-x-hidden text-white pb-16"
       style={{
         background: "radial-gradient(ellipse 80% 60% at 50% 30%, #1a1a4e 0%, #06061a 75%)",
       }}
     >
       {/* ── TOP NAV ── */}
       <nav className="w-full h-28 flex items-center justify-center px-6 md:px-12 relative z-20">
-        {/* الروابط في المنتصف تماماً */}
         <div
           className="flex items-center gap-6"
           style={{ fontFamily: "'Lifta', sans-serif" }}
@@ -65,7 +69,6 @@ export default function FAQPage() {
             الرئيسية
           </Link>
 
-          {/* separator */}
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
           {/* كيف يعمل */}
@@ -76,7 +79,16 @@ export default function FAQPage() {
             كيف يعمل
           </Link>
 
-          {/* separator */}
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
+
+          {/* ويدجيت */}
+          <Link
+            href="/widget"
+            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            ويدجيت
+          </Link>
+
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
           {/* أسئلة شائعة (Active) */}
@@ -94,12 +106,10 @@ export default function FAQPage() {
       <div className="flex flex-col items-center text-center px-6 w-full max-w-4xl mt-10 md:mt-14 z-10">
         {/* Header Title */}
         <h1
-          className="select-none mb-4"
+          className="text-4xl md:text-6xl font-bold tracking-tight mb-4"
           style={{
             fontFamily: "'Lifta', sans-serif",
-            fontSize: "clamp(40px,6vw,60px)",
-            color: "#ffffff",
-            textShadow: "0 4px 18px rgba(0,0,0,0.85), 0 0 35px rgba(88,101,242,0.4)",
+            textShadow: "0 0 30px rgba(88,101,242,0.4)",
           }}
         >
           الأسئلة الشائعة
@@ -107,75 +117,59 @@ export default function FAQPage() {
 
         <p
           className="text-base md:text-lg text-gray-300 mb-14 max-w-xl leading-relaxed"
-          style={{
-            fontFamily: "'IBM Plex Sans Arabic', sans-serif",
-            textShadow: "1px 2px 6px rgba(0,0,0,0.8)",
-          }}
+          style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
         >
-          إليك كل ما تحتاج لمعرفته حول استخدام{" "}
-          <Link
-            href="/"
-            className="transition-colors duration-200 hover:brightness-125 hover:underline"
-            style={{ color: "#5865f2", fontWeight: 700 }}
-          >
-            Quester
-          </Link>
-          {" "}وكيفية تشغيل مهام الديسكورد بكل أمان وسهولة.
+          إليك أكثر الأسئلة التي يطرحها المستخدمون حول Quester Bot وكيفية استخدامه بكل سهولة وأمان
         </p>
 
-        {/* ── FAQ ACCORDION LIST ── */}
-        <div className="w-full space-y-5 text-right" dir="rtl">
+        {/* ── ACCORDION LIST ── */}
+        <div
+          className="w-full space-y-4 text-right"
+          style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+        >
           {faqs.map((faq, idx) => {
             const isOpen = openIndex === idx;
             return (
               <div
                 key={idx}
-                className="overflow-hidden rounded-2xl transition-all duration-300"
+                className="overflow-hidden rounded-2xl transition-all duration-300 border border-white/10"
                 style={{
                   background: isOpen
-                    ? "linear-gradient(135deg, rgba(88, 101, 242, 0.16) 0%, rgba(20, 20, 55, 0.75) 100%)"
-                    : "rgba(15, 15, 40, 0.65)",
-                  border: isOpen
-                    ? "1px solid rgba(88, 101, 242, 0.5)"
-                    : "1px solid rgba(255, 255, 255, 0.1)",
-                  boxShadow: isOpen
-                    ? "0 12px 35px rgba(88, 101, 242, 0.22), inset 0 1px 0 rgba(255,255,255,0.15)"
-                    : "0 4px 18px rgba(0, 0, 0, 0.45)",
-                  backdropFilter: "blur(14px)",
+                    ? "linear-gradient(135deg, rgba(88,101,242,0.12) 0%, rgba(20,20,50,0.6) 100%)"
+                    : "rgba(10, 10, 30, 0.45)",
+                  backdropFilter: "blur(12px)",
                 }}
               >
+                {/* Accordion Header */}
                 <button
+                  type="button"
                   onClick={() => toggle(idx)}
-                  className="w-full px-7 py-6 flex items-center justify-between gap-5 text-right cursor-pointer select-none group"
+                  className="w-full flex items-center justify-between p-5 md:p-6 text-right focus:outline-none cursor-pointer select-none group"
                 >
                   <span
-                    className="font-bold text-lg md:text-xl transition-colors duration-200"
-                    style={{
-                      fontFamily: "'Lifta', sans-serif",
-                      color: isOpen ? "#ffffff" : "#e4e4e7",
-                      textShadow: isOpen ? "0 0 14px rgba(88,101,242,0.6)" : "none",
-                    }}
+                    className="text-base md:text-lg font-bold transition-colors duration-200"
+                    style={{ color: isOpen ? "#ffffff" : "#e2e8f0" }}
                   >
                     {faq.question}
                   </span>
 
+                  {/* Icon Indicator */}
                   <span
                     className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 text-xs font-bold ${
                       isOpen
-                        ? "bg-[#5865F2] text-white rotate-180 shadow-[0_0_14px_rgba(88,101,242,0.8)]"
-                        : "bg-white/10 text-white/70 group-hover:bg-white/20"
+                        ? "bg-[#5865F2] text-white rotate-180 shadow-[0_0_12px_rgba(88,101,242,0.8)]"
+                        : "bg-white/10 text-gray-300 group-hover:bg-white/20"
                     }`}
                   >
                     ▼
                   </span>
                 </button>
 
+                {/* Accordion Body */}
                 {isOpen && (
                   <div
                     className="px-7 pb-6 pt-3 text-gray-300 text-sm md:text-base leading-loose border-t border-white/5"
-                    style={{
-                      fontFamily: "'IBM Plex Sans Arabic', sans-serif",
-                    }}
+                    style={{ animation: "fadeIn 0.3s ease-in-out" }}
                   >
                     {faq.answer}
                   </div>
@@ -185,25 +179,23 @@ export default function FAQPage() {
           })}
         </div>
 
-        {/* ── BACK TO HOME CTA ── */}
-        <div className="mt-16 mb-8 flex flex-col items-center">
+        {/* ── BOTTOM CTA ── */}
+        <div className="mt-16 flex flex-col items-center">
           <Link
-            href="/"
+            href="/tool"
             className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95"
           >
             <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#5865F2] via-[#7289da] to-[#4752c4] opacity-80 blur-sm transition-all duration-300 group-hover:opacity-100 group-hover:blur-md" />
-
             <span
               className="relative flex items-center justify-center px-20 py-4.5 rounded-full text-white font-bold transition-all duration-300 min-w-[220px]"
               style={{
                 fontFamily: "'Lifta', sans-serif",
-                fontSize: "22px",
+                fontSize: "19px",
                 background: "linear-gradient(180deg, #5865F2 0%, #3c45a5 100%)",
-                boxShadow: "0 8px 25px rgba(88, 101, 242, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.35)",
-                textShadow: "0 2px 8px rgba(0,0,0,0.5)",
+                boxShadow: "0 6px 20px rgba(88, 101, 242, 0.4)",
               }}
             >
-              العودة للرئيسية
+              ابدأ الآن مجاناً
             </span>
           </Link>
         </div>
@@ -211,12 +203,10 @@ export default function FAQPage() {
 
       {/* ── FOOTER ── */}
       <footer
-        className="w-full flex flex-col items-center justify-center gap-2 py-6 select-none border-t border-white/5 mt-10"
+        className="mt-20 flex flex-col items-center justify-center gap-2 select-none z-10"
         style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
       >
-        {/* Social Links */}
-        <div className="flex items-center gap-3 mb-1">
-          {/* Facebook */}
+        <div className="flex items-center gap-3">
           <a
             href="https://facebook.com/j1slc"
             target="_blank"
@@ -228,8 +218,6 @@ export default function FAQPage() {
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
             </svg>
           </a>
-
-          {/* Instagram */}
           <a
             href="https://instagram.com/j1slc"
             target="_blank"
@@ -242,7 +230,6 @@ export default function FAQPage() {
             </svg>
           </a>
         </div>
-
         <p className="text-[12px] md:text-[13px] text-white/50 tracking-wider">
           Copyrights © Quester | 2026. All rights reserved. made by{" "}
           <span className="text-[#5865F2] font-semibold">Jio</span>
