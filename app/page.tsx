@@ -24,15 +24,14 @@ export default function HomePage() {
           {/* separator */}
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
-          {/* ويدجيت */}
+          {/* الشارات */}
           <Link
-            href="/widget"
+            href="/badges"
             className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
-            ويدجيت
+            الشارات
           </Link>
 
-          {/* separator */}
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
           {/* أسئلة شائعة */}

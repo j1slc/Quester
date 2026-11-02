@@ -67,6 +67,53 @@ export default function ToolPage() {
   const pendingAutoStartRef = useRef<ParsedQuest | null>(null);
   const questsRef = useRef<ParsedQuest[]>([]);
 
+  // Automatic countdown before next quest
+  const [waitingCountdown, setWaitingCountdown] = useState<number | null>(null);
+  const [nextQueuedQuest, setNextQueuedQuest] = useState<ParsedQuest | null>(null);
+  const waitingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear countdown timer on unmount
+  useEffect(() => {
+    return () => {
+      if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
+    };
+  }, []);
+
+  const startNextQuestCountdown = (nextQuest: ParsedQuest, durationSec: number = 60) => {
+    if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
+    setNextQueuedQuest(nextQuest);
+    setWaitingCountdown(durationSec);
+    addLog(`⏳ يرجى الانتظار قليلاً ... سيتم تشغيل المهمة التالية تلقائياً بعد ${durationSec} ثانية: ${nextQuest.title}`);
+
+    let remaining = durationSec;
+    waitingTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
+        waitingTimerRef.current = null;
+        setWaitingCountdown(null);
+        setNextQueuedQuest(null);
+        startRunner(nextQuest);
+      } else {
+        setWaitingCountdown(remaining);
+        if (remaining === 30 || remaining === 15 || remaining === 5) {
+          addLog(`⏳ يرجى الانتظار قليلاً ... متبقي ${remaining} ثانية على بدء المهمة التالية`);
+        }
+      }
+    }, 1000);
+  };
+
+  const skipWaitingAndStart = () => {
+    if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
+    waitingTimerRef.current = null;
+    const q = nextQueuedQuest;
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
+    if (q) {
+      startRunner(q);
+    }
+  };
+
   // Auto scroll logs
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -187,6 +234,12 @@ export default function ToolPage() {
   };
 
   const handleLogout = () => {
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
     stopRunner();
     localStorage.removeItem("quester_token");
     setUser(null);
@@ -199,6 +252,12 @@ export default function ToolPage() {
 
   const handleSelectQuest = (q: ParsedQuest) => {
     if (isRunning) return;
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
     setSelectedQuest(q);
     const mainTask = q.tasks[0];
     setCurrentProgress(mainTask?.current || 0);
@@ -209,6 +268,12 @@ export default function ToolPage() {
   };
 
   const startRunner = async (questOverride?: ParsedQuest | null) => {
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
     const quest = questOverride || selectedQuest;
     if (!quest || !token || isRunningRef.current) return;
 
@@ -315,19 +380,25 @@ export default function ToolPage() {
         addLog("تم إيقاف تشغيل المهمة يدوياً.");
       }
     } finally {
-      // Auto start the next quest if one was queued after completion
+      // Auto start the next quest after 60 seconds countdown
       const nextToRun = pendingAutoStartRef.current;
       pendingAutoStartRef.current = null;
       isRunningRef.current = false;
       setIsRunning(false);
       abortControllerRef.current = null;
       if (nextToRun) {
-        startRunner(nextToRun);
+        startNextQuestCountdown(nextToRun, 60);
       }
     }
   };
 
   const stopRunner = () => {
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -349,8 +420,8 @@ export default function ToolPage() {
     filterTab === "available"
       ? availableQuests
       : filterTab === "completed"
-      ? completedQuests
-      : quests;
+        ? completedQuests
+        : quests;
 
   return (
     <main
@@ -384,10 +455,10 @@ export default function ToolPage() {
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
-            href="/widget"
+            href="/badges"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
-            ويدجيت
+            الشارات
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
@@ -595,11 +666,10 @@ export default function ToolPage() {
                 <div className="flex items-center p-1 rounded-2xl bg-black/40 border border-white/10 gap-1.5 text-xs md:text-sm">
                   <button
                     onClick={() => setFilterTab("available")}
-                    className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${
-                      filterTab === "available"
+                    className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "available"
                         ? "bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/40"
                         : "text-gray-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <span>المتاحة للبدء</span>
                     <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs font-mono">
@@ -609,11 +679,10 @@ export default function ToolPage() {
 
                   <button
                     onClick={() => setFilterTab("completed")}
-                    className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${
-                      filterTab === "completed"
+                    className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "completed"
                         ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/40"
                         : "text-gray-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <span>المكتملة</span>
                     <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs font-mono">
@@ -623,11 +692,10 @@ export default function ToolPage() {
 
                   <button
                     onClick={() => setFilterTab("all")}
-                    className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${
-                      filterTab === "all"
+                    className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "all"
                         ? "bg-white/20 text-white"
                         : "text-gray-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <span>الكل</span>
                     <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs font-mono">
@@ -666,11 +734,10 @@ export default function ToolPage() {
                       <div
                         key={q.id}
                         onClick={() => handleSelectQuest(q)}
-                        className={`relative rounded-3xl p-5 border transition-all duration-300 cursor-pointer overflow-hidden ${
-                          isSelected
+                        className={`relative rounded-3xl p-5 border transition-all duration-300 cursor-pointer overflow-hidden ${isSelected
                             ? "border-[#5865F2] bg-[#5865F2]/15 shadow-xl shadow-[#5865F2]/20 scale-[1.02]"
                             : "border-white/10 bg-black/30 hover:border-white/20 hover:bg-white/5"
-                        }`}
+                          }`}
                       >
                         {/* Top banner / icon */}
                         <div className="flex items-start gap-3 mb-4">
@@ -764,7 +831,12 @@ export default function ToolPage() {
 
                   {/* Status Badge */}
                   <div>
-                    {isCompleted ? (
+                    {waitingCountdown !== null && waitingCountdown > 0 ? (
+                      <span className="px-4 py-2 rounded-full bg-[#5865F2]/20 text-[#7289da] border border-[#5865F2]/40 text-sm font-bold flex items-center gap-2 animate-pulse shadow-lg">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#5865F2] animate-ping" />
+                        <span>يرجى الانتظار قليلاً ({waitingCountdown}s)...</span>
+                      </span>
+                    ) : isCompleted ? (
                       <span className="px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-sm font-bold flex items-center gap-1.5 shadow-lg">
                         <span>🎉</span>
                         <span>مهمة مكتملة ومستلمة!</span>
@@ -800,6 +872,44 @@ export default function ToolPage() {
                     />
                   </div>
                 </div>
+
+                {/* ── WAITING / COOLDOWN BANNER BEFORE NEXT QUEST ── */}
+                {waitingCountdown !== null && waitingCountdown > 0 && nextQueuedQuest && (
+                  <div className="w-full p-5 mb-8 rounded-2xl bg-gradient-to-r from-[#5865F2]/20 via-[#404EED]/15 to-[#5865F2]/20 border border-[#5865F2]/40 text-center relative overflow-hidden backdrop-blur-xl shadow-[0_0_25px_rgba(88,101,242,0.25)]">
+                    <div className="flex items-center justify-center gap-2 mb-1.5">
+                      <span className="text-xl">⏳</span>
+                      <h4
+                        className="text-xl md:text-2xl font-bold text-white tracking-wide"
+                        style={{ fontFamily: "'Lifta', sans-serif" }}
+                      >
+                        يرجى الانتظار قليلاً ...
+                      </h4>
+                    </div>
+
+                    <p
+                      className="text-xs md:text-sm text-gray-300 mb-4 max-w-lg mx-auto leading-relaxed"
+                      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+                    >
+                      اكتملت المهمة السابقة بنجاح! جاري تحضير وبدء المهمة التالية تلقائياً:{" "}
+                      <strong className="text-white font-bold">{nextQueuedQuest.title}</strong>
+                    </p>
+
+                    <div className="flex items-center justify-center gap-4">
+                      <div className="px-5 py-2.5 rounded-xl bg-black/50 border border-white/10 font-mono text-2xl font-bold text-[#7289da] shadow-inner">
+                        00:{waitingCountdown < 10 ? `0${waitingCountdown}` : waitingCountdown}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={skipWaitingAndStart}
+                        className="px-5 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-[#5865F2]/30 cursor-pointer hover:scale-105 active:scale-95"
+                        style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+                      >
+                        بدء الآن دون انتظار ⚡
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Control Action Buttons */}
                 <div className="flex flex-wrap items-center gap-4 mb-8">
@@ -869,15 +979,14 @@ export default function ToolPage() {
                       logs.map((l, idx) => (
                         <div
                           key={idx}
-                          className={`${
-                            l.includes("خطأ") || l.includes("تحذير")
+                          className={`${l.includes("خطأ") || l.includes("تحذير")
                               ? "text-red-400"
                               : l.includes("🎉") || l.includes("مبروك")
-                              ? "text-emerald-400 font-bold"
-                              : l.includes("🚀")
-                              ? "text-[#7289da] font-semibold"
-                              : "text-gray-300"
-                          }`}
+                                ? "text-emerald-400 font-bold"
+                                : l.includes("🚀")
+                                  ? "text-[#7289da] font-semibold"
+                                  : "text-gray-300"
+                            }`}
                         >
                           {l}
                         </div>

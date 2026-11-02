@@ -12,28 +12,24 @@ export default function HowItWorksPage() {
       title: "الحصول على التوكن (Token)",
       desc: "افتح ديسكورد عبر المتصفح (Web)، افتح أدوات المطور بالضغط على F12، وانتقل إلى تبويب Application ثم Local Storage، وانسخ رمز الـ Token الخاص بحسابك بكل أمان.",
       badge: "الخطوة الأولى",
-      icon: "🔑",
     },
     {
       step: "02",
       title: "تسجيل الدخول في الأداة",
       desc: "ضع التوكن في الخانة المخصصة داخل صفحة الأداة واضغط على فحص والاتصال. سيتعرف النظام تلقائياً على حسابك ومهامك المتاحة دون الحاجة لكلمة سر.",
       badge: "الخطوة الثانية",
-      icon: "⚡",
     },
     {
       step: "03",
       title: "اختيار المهمة وبدء التشغيل",
       desc: "اختر المهمة التي ترغب بإنهائها، واضغط على زر التشغيل التلقائي. سيقوم البوت بمحاكاة اللعب والبث وإرسال نبضات التقدم لسيرفرات ديسكورد تلقائياً.",
       badge: "الخطوة الثالثة",
-      icon: "🎮",
     },
     {
       step: "04",
       title: "استلام المكافأة والجوائز",
       desc: "بمجرد وصول شريط التقدم إلى 100%، سيتم تأكيد إكمال المهمة وإضافة الجائزة (شخصيات، عناصر، شارات) إلى صندوق هدايا حسابك في ديسكورد فوراً.",
       badge: "الخطوة الأخيرة",
-      icon: "🎁",
     },
   ];
 
@@ -71,12 +67,12 @@ export default function HowItWorksPage() {
 
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
 
-          {/* ويدجيت */}
+          {/* الشارات */}
           <Link
-            href="/widget"
+            href="/badges"
             className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
-            ويدجيت
+            الشارات
           </Link>
 
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
@@ -124,8 +120,8 @@ export default function HowItWorksPage() {
                 type="button"
                 onClick={() => setActiveStep(idx)}
                 className={`group relative flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold transition-all duration-300 cursor-pointer select-none ${isActive
-                    ? "text-white shadow-[0_0_20px_rgba(88,101,242,0.6)] scale-[1.03]"
-                    : "text-gray-300 hover:text-white hover:bg-white/5 opacity-80 hover:opacity-100"
+                  ? "text-white shadow-[0_0_20px_rgba(88,101,242,0.6)] scale-[1.03]"
+                  : "text-gray-300 hover:text-white hover:bg-white/5 opacity-80 hover:opacity-100"
                   }`}
                 style={{
                   background: isActive
@@ -137,7 +133,6 @@ export default function HowItWorksPage() {
                   backdropFilter: "blur(12px)",
                 }}
               >
-                <span className="text-xl">{s.icon}</span>
                 <span className="text-sm md:text-base font-sans">{s.step}</span>
               </button>
             );
@@ -190,11 +185,11 @@ export default function HowItWorksPage() {
               disabled={activeStep === 0}
               onClick={() => setActiveStep((prev) => Math.max(0, prev - 1))}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeStep === 0
-                  ? "opacity-30 cursor-not-allowed text-gray-500"
-                  : "bg-white/5 hover:bg-white/10 text-white cursor-pointer"
+                ? "opacity-30 cursor-not-allowed text-gray-500"
+                : "bg-white/5 hover:bg-white/10 text-white cursor-pointer"
                 }`}
             >
-              ← الخطوة السابقة
+              → الخطوة السابقة
             </button>
 
             <button
@@ -202,11 +197,11 @@ export default function HowItWorksPage() {
               disabled={activeStep === steps.length - 1}
               onClick={() => setActiveStep((prev) => Math.min(steps.length - 1, prev + 1))}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeStep === steps.length - 1
-                  ? "opacity-30 cursor-not-allowed text-gray-500"
-                  : "bg-[#5865F2] hover:bg-[#4752c4] text-white cursor-pointer shadow-lg shadow-[#5865F2]/30"
+                ? "opacity-30 cursor-not-allowed text-gray-500"
+                : "bg-[#5865F2] hover:bg-[#4752c4] text-white cursor-pointer shadow-lg shadow-[#5865F2]/30"
                 }`}
             >
-              الخطوة التالية →
+              الخطوة التالية ←
             </button>
           </div>
         </div>

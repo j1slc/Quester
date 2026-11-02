@@ -17,6 +17,12 @@ export interface DiscordUser {
   avatar: string | null;
   global_name?: string | null;
   email?: string | null;
+  banner?: string | null;
+  banner_color?: string | null;
+  accent_color?: number | null;
+  flags?: number;
+  public_flags?: number;
+  premium_type?: number;
 }
 
 export async function fetchDiscordUser(token: string): Promise<DiscordUser | null> {
