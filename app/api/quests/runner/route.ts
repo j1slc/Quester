@@ -214,6 +214,7 @@ export async function POST(req: Request) {
             });
 
             if (isCompleted) {
+              console.log(`[RUNNER] Quest ${questId} completed! Sending completed event.`);
               sendEvent("completed", {
                 message: "🎉 ألف مبروك! اكتملت المهمة بنجاح، وتمت إضافة الجائزة إلى حسابك!",
               });
@@ -237,6 +238,7 @@ export async function POST(req: Request) {
             });
 
             if (isCompleted) {
+              console.log(`[RUNNER] Quest ${questId} simulation completed! Sending completed event.`);
               sendEvent("completed", {
                 message: "🎉 تم الوصول للهدف!",
               });

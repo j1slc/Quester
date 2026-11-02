@@ -13,6 +13,13 @@ const ibmPlex = IBM_Plex_Sans_Arabic({
 export const metadata: Metadata = {
   title: "Quester — Discord Quest Bot",
   description: "هذا البوت يستخدم في عمل مهام الديسكورد تلقائياً وبسهولة",
+  icons: {
+    icon: [
+      { url: "/icon.png?v=2", type: "image/png" },
+    ],
+    shortcut: "/icon.png?v=2",
+    apple: "/icon.png?v=2",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -66,6 +66,7 @@ export default function ToolPage() {
   const isRunningRef = useRef<boolean>(false);
   const pendingAutoStartRef = useRef<ParsedQuest | null>(null);
   const questsRef = useRef<ParsedQuest[]>([]);
+  const completedQuestIdsRef = useRef<Set<string>>(new Set());
 
   // Automatic countdown before next quest
   const [waitingCountdown, setWaitingCountdown] = useState<number | null>(null);
@@ -80,8 +81,17 @@ export default function ToolPage() {
   }, []);
 
   const startNextQuestCountdown = (nextQuest: ParsedQuest, durationSec: number = 60) => {
-    if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
     setNextQueuedQuest(nextQuest);
+    setSelectedQuest(nextQuest);
+    const mainTask = nextQuest.tasks[0];
+    setCurrentProgress(mainTask?.current || 0);
+    setTargetSeconds(mainTask?.target || 900);
+    setProgressPercent(nextQuest.overallPercent || 0);
+    setIsCompleted(false);
     setWaitingCountdown(durationSec);
     addLog(`⏳ يرجى الانتظار قليلاً ... سيتم تشغيل المهمة التالية تلقائياً بعد ${durationSec} ثانية: ${nextQuest.title}`);
 
@@ -93,25 +103,39 @@ export default function ToolPage() {
         waitingTimerRef.current = null;
         setWaitingCountdown(null);
         setNextQueuedQuest(null);
+        addLog(`⚡ انتهت مدة الانتظار! جاري بدء تشغيل المهمة: ${nextQuest.title}`);
         startRunner(nextQuest);
       } else {
         setWaitingCountdown(remaining);
-        if (remaining === 30 || remaining === 15 || remaining === 5) {
-          addLog(`⏳ يرجى الانتظار قليلاً ... متبقي ${remaining} ثانية على بدء المهمة التالية`);
+        if (remaining === 45 || remaining === 30 || remaining === 15 || remaining === 5) {
+          addLog(`⏳ يرجى الانتظار قليلاً ... متبقي ${remaining} ثانية على بدء المهمة التالية: ${nextQuest.title}`);
         }
       }
     }, 1000);
   };
 
   const skipWaitingAndStart = () => {
-    if (waitingTimerRef.current) clearInterval(waitingTimerRef.current);
-    waitingTimerRef.current = null;
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
     const q = nextQueuedQuest;
     setWaitingCountdown(null);
     setNextQueuedQuest(null);
     if (q) {
+      addLog(`⚡ تم تخطي فترة الانتظار! بدء المهمة الآن: ${q.title}`);
       startRunner(q);
     }
+  };
+
+  const cancelWaiting = () => {
+    if (waitingTimerRef.current) {
+      clearInterval(waitingTimerRef.current);
+      waitingTimerRef.current = null;
+    }
+    setWaitingCountdown(null);
+    setNextQueuedQuest(null);
+    addLog("تم إلغاء الانتظار والتشغيل التلقائي.");
   };
 
   // Auto scroll logs
@@ -196,33 +220,46 @@ export default function ToolPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        questsRef.current = data.quests;
-        setQuests(data.quests);
-        const uncompleted = data.quests.find((q: ParsedQuest) => !q.isCompleted);
-        const firstToSelect = uncompleted || data.quests[0];
-        if (selectedQuest) {
-          const updated = data.quests.find((q: ParsedQuest) => q.id === selectedQuest.id);
-          if (updated) {
-            setSelectedQuest(updated);
-            if (!isRunningRef.current) {
+        // Merge with locally completed quest IDs to avoid stale Discord API latency
+        const completedIds = completedQuestIdsRef.current;
+        const mergedQuests: ParsedQuest[] = data.quests.map((q: ParsedQuest) => {
+          if (completedIds.has(q.id)) {
+            return { ...q, isCompleted: true, overallPercent: 100 };
+          }
+          return q;
+        });
+
+        questsRef.current = mergedQuests;
+        setQuests(mergedQuests);
+
+        // Only switch selected quest if not running and not currently in countdown
+        if (!isRunningRef.current && waitingTimerRef.current === null) {
+          const uncompleted = mergedQuests.find((q: ParsedQuest) => !q.isCompleted);
+          const firstToSelect = uncompleted || mergedQuests[0];
+          if (selectedQuest) {
+            const updated = mergedQuests.find((q: ParsedQuest) => q.id === selectedQuest.id);
+            if (updated) {
+              setSelectedQuest(updated);
               const mainTask = updated.tasks[0];
               setCurrentProgress(mainTask?.current || 0);
               setTargetSeconds(mainTask?.target || 900);
               setProgressPercent(updated.overallPercent || 0);
               setIsCompleted(updated.isCompleted);
             }
+          } else if (mergedQuests.length > 0) {
+            setSelectedQuest(firstToSelect);
+            setCurrentProgress(firstToSelect.tasks[0]?.current || 0);
+            setTargetSeconds(firstToSelect.tasks[0]?.target || 900);
+            setProgressPercent(firstToSelect.overallPercent || 0);
+            setIsCompleted(firstToSelect.isCompleted);
           }
-        } else if (data.quests.length > 0) {
-          setSelectedQuest(firstToSelect);
-          setCurrentProgress(firstToSelect.tasks[0]?.current || 0);
-          setTargetSeconds(firstToSelect.tasks[0]?.target || 900);
-          setProgressPercent(firstToSelect.overallPercent || 0);
-          setIsCompleted(firstToSelect.isCompleted);
         }
         addLog(`تم العثور على ${data.quests.length} مهمة في حسابك`);
 
         // Auto start the first uncompleted quest if requested (e.g. right after login)
-        if (opts?.autoStart && data.quests.length > 0 && !isRunningRef.current && !firstToSelect.isCompleted) {
+        const uncompleted = mergedQuests.find((q: ParsedQuest) => !q.isCompleted);
+        const firstToSelect = uncompleted || mergedQuests[0];
+        if (opts?.autoStart && mergedQuests.length > 0 && !isRunningRef.current && firstToSelect && !firstToSelect.isCompleted) {
           startRunner(firstToSelect);
         }
       }
@@ -252,12 +289,6 @@ export default function ToolPage() {
 
   const handleSelectQuest = (q: ParsedQuest) => {
     if (isRunning) return;
-    if (waitingTimerRef.current) {
-      clearInterval(waitingTimerRef.current);
-      waitingTimerRef.current = null;
-    }
-    setWaitingCountdown(null);
-    setNextQueuedQuest(null);
     setSelectedQuest(q);
     const mainTask = q.tasks[0];
     setCurrentProgress(mainTask?.current || 0);
@@ -265,6 +296,12 @@ export default function ToolPage() {
     setProgressPercent(q.overallPercent || 0);
     setIsCompleted(q.isCompleted);
     addLog(`تم اختيار مهمة: ${q.title}`);
+
+    // If waiting countdown is running and user picks an uncompleted quest, update queue
+    if (waitingTimerRef.current !== null && !q.isCompleted) {
+      setNextQueuedQuest(q);
+      addLog(`⏳ تم تعيين المهمة التالية في طابور الانتظار: ${q.title}`);
+    }
   };
 
   const startRunner = async (questOverride?: ParsedQuest | null) => {
@@ -351,20 +388,28 @@ export default function ToolPage() {
             setProgressPercent(dataObj.percent);
             if (dataObj.completed) {
               setIsCompleted(true);
+              completedQuestIdsRef.current.add(quest.id);
             }
           } else if (eventType === "completed") {
             setIsCompleted(true);
+            completedQuestIdsRef.current.add(quest.id);
             addLog(dataObj.message || "🎉 اكتملت المهمة بنجاح!");
 
-            // Auto start the next quest when one is available
-            const nextQuest =
-              questsRef.current.find((q) => !q.isCompleted && q.id !== quest.id) ||
-              questsRef.current.find((q) => !q.isCompleted);
-            if (nextQuest && nextQuest.id !== quest.id) {
+            // Mark this quest as completed in local state immediately so it's never selected again
+            questsRef.current = questsRef.current.map((q) =>
+              q.id === quest.id ? { ...q, isCompleted: true, overallPercent: 100 } : q
+            );
+            setQuests([...questsRef.current]);
+
+            // Auto queue the next quest when one is available
+            const nextQuest = questsRef.current.find(
+              (q) => !completedQuestIdsRef.current.has(q.id) && !q.isCompleted && q.id !== quest.id
+            );
+            if (nextQuest) {
               pendingAutoStartRef.current = nextQuest;
             }
 
-            // Refresh list
+            // Refresh list in background
             loadQuests(token.trim());
           } else if (eventType === "error") {
             setErrorMsg(dataObj.message);
@@ -380,14 +425,27 @@ export default function ToolPage() {
         addLog("تم إيقاف تشغيل المهمة يدوياً.");
       }
     } finally {
-      // Auto start the next quest after 60 seconds countdown
-      const nextToRun = pendingAutoStartRef.current;
-      pendingAutoStartRef.current = null;
       isRunningRef.current = false;
       setIsRunning(false);
       abortControllerRef.current = null;
+
+      // Auto start the next quest after 60 seconds countdown
+      const nextToRun =
+        pendingAutoStartRef.current ||
+        questsRef.current.find(
+          (q) => !completedQuestIdsRef.current.has(q.id) && !q.isCompleted && q.id !== quest.id
+        );
+      pendingAutoStartRef.current = null;
+
       if (nextToRun) {
         startNextQuestCountdown(nextToRun, 60);
+      } else {
+        const hasAnyUnfinished = questsRef.current.some(
+          (q) => !completedQuestIdsRef.current.has(q.id) && !q.isCompleted
+        );
+        if (!hasAnyUnfinished) {
+          addLog("🎉 تهانينا! اكتملت جميع المهام بنجاح ولا توجد مهام أخرى.");
+        }
       }
     }
   };
@@ -913,7 +971,27 @@ export default function ToolPage() {
 
                 {/* Control Action Buttons */}
                 <div className="flex flex-wrap items-center gap-4 mb-8">
-                  {!isRunning ? (
+                  {waitingCountdown !== null && waitingCountdown > 0 ? (
+                    <div className="flex-1 flex flex-wrap gap-3">
+                      <button
+                        onClick={skipWaitingAndStart}
+                        className="flex-1 py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-xl shadow-[#5865F2]/40 flex items-center justify-center gap-2 text-base md:text-lg"
+                        style={{
+                          fontFamily: "'Lifta', sans-serif",
+                          background: "linear-gradient(135deg, #5865F2 0%, #3c45a5 100%)",
+                        }}
+                      >
+                        <span>⚡ بدء المهمة التالية فوراً دون انتظار (00:{waitingCountdown < 10 ? `0${waitingCountdown}` : waitingCountdown})</span>
+                      </button>
+                      <button
+                        onClick={cancelWaiting}
+                        className="py-4 px-6 rounded-2xl font-bold text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all cursor-pointer text-sm md:text-base hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ fontFamily: "'Lifta', sans-serif" }}
+                      >
+                        <span>إلغاء الانتظار ⏹️</span>
+                      </button>
+                    </div>
+                  ) : !isRunning ? (
                     <button
                       onClick={() => startRunner()}
                       disabled={isCompleted}

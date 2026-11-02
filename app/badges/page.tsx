@@ -386,36 +386,39 @@ export default function BadgesPage() {
       }}
     >
       {/* ── TOP NAV ── */}
-      <nav className="w-full h-28 flex items-center justify-center px-6 md:px-12 relative z-20">
+      <nav className="w-full h-24 flex items-center justify-center relative px-6 md:px-12 z-20">
+        {/* العودة للرئيسية — أقصى اليمين */}
+        <Link
+          href="/"
+          className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 text-white/80 hover:text-white transition-all flex items-center gap-2 group text-sm md:text-base font-semibold select-none"
+          style={{ fontFamily: "'Lifta', sans-serif" }}
+        >
+          <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
+          <span>العودة للرئيسية</span>
+        </Link>
+
+        {/* الروابط في المنتصف تماماً */}
         <div
-          className="flex items-center gap-6"
+          className="flex items-center gap-6 text-base md:text-lg"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
           <Link
-            href="/"
-            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
-          >
-            الرئيسية
-          </Link>
-          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
-          <Link
             href="/how-it-works"
-            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             كيف يعمل
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
-            href="/badges"
-            className="text-white text-lg font-bold transition-all duration-200 outline-none select-none drop-shadow-[0_0_14px_rgba(88,101,242,0.9)]"
-            style={{ color: "#7289da" }}
+            href="/tool"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
-            الشارات
+            المهام
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
             href="/faq"
-            className="text-white/85 hover:text-white text-lg transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             أسئلة شائعة
           </Link>
