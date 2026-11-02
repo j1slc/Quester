@@ -410,7 +410,7 @@ export default function BadgesPage() {
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
-            href="/tool"
+            href="/quests"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             المهام

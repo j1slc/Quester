@@ -58,7 +58,7 @@ export default function HowItWorksPage() {
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
           <Link
-            href="/tool"
+            href="/quests"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             المهام
@@ -202,7 +202,7 @@ export default function HowItWorksPage() {
         {/* ── BOTTOM CTA ── */}
         <div className="mt-16 flex flex-col items-center">
           <Link
-            href="/tool"
+            href="/quests"
             className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95"
           >
             <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#5865F2] via-[#7289da] to-[#4752c4] opacity-80 blur-sm transition-all duration-300 group-hover:opacity-100 group-hover:blur-md" />
