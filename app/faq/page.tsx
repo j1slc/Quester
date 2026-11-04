@@ -52,14 +52,14 @@ export default function FAQPage() {
     >
       {/* ── TOP NAV ── */}
       <nav className="w-full h-24 flex items-center justify-center relative px-6 md:px-12 z-20">
-        {/* العودة للرئيسية — أقصى اليمين */}
+        {/* العودة — أقصى اليمين */}
         <Link
           href="/"
           className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 text-white/80 hover:text-white transition-all flex items-center gap-2 group text-sm md:text-base font-semibold select-none"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
           <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
-          <span>العودة للرئيسية</span>
+          <span>العودة</span>
         </Link>
 
         {/* الروابط في المنتصف تماماً */}
