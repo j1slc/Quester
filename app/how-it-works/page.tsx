@@ -28,7 +28,7 @@ export default function HowItWorksPage() {
     {
       step: "04",
       title: "استلام المكافأة والجوائز",
-      desc: "بمجرد وصول شريط التقدم إلى 100%، سيتم تأكيد إكمال المهمة وإضافة الجائزة (شخصيات، عناصر، شارات) إلى صندوق هدايا حسابك في ديسكورد فوراً.",
+      desc: "بمجرد وصول شريط التقدم إلى 100%، سيتم تأكيد إكمال المهمة وإضافة الجائزة (شخصيات، عناصر، ألعاب) إلى صندوق هدايا حسابك في ديسكورد فوراً.",
       badge: "الخطوة الأخيرة",
     },
   ];
@@ -62,13 +62,6 @@ export default function HowItWorksPage() {
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             المهام
-          </Link>
-          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
-          <Link
-            href="/badges"
-            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
-          >
-            الشارات
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link

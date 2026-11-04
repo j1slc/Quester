@@ -1,22 +1,6 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function HomePage() {
-  const [showModal, setShowModal] = useState(false);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowModal(false);
-    };
-    if (showModal) {
-      window.addEventListener("keydown", handleKeyDown);
-    }
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showModal]);
-
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
@@ -105,11 +89,10 @@ export default function HomePage() {
           ابدأ الآن، ماذا تنتظر؟
         </p>
 
-        {/* CTA Button — Opens Pop-up modal */}
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="group relative mt-7 inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+        {/* CTA Button — Direct to /quests */}
+        <Link
+          href="/quests"
+          className="group relative mt-7 inline-flex items-center justify-center overflow-hidden rounded-full p-[2px] transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer select-none"
         >
           {/* Glowing animated border/backdrop */}
           <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#5865F2] via-[#7289da] to-[#4752c4] opacity-80 blur-sm transition-all duration-300 group-hover:opacity-100 group-hover:blur-md" />
@@ -128,128 +111,8 @@ export default function HomePage() {
           >
             اضغط هُنا
           </span>
-        </button>
+        </Link>
       </div>
-
-      {/* ── SELECTION POP-UP MODAL ── */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/75 backdrop-blur-md animate-fadeIn"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="relative w-full max-w-2xl rounded-3xl p-6 md:p-10 border border-white/20 shadow-2xl overflow-hidden text-center transition-all duration-300 scale-100"
-            style={{
-              background: "radial-gradient(ellipse 95% 75% at 50% 15%, #202058 0%, #0a0a22 100%)",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(88,101,242,0.3)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-            dir="rtl"
-          >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="absolute top-5 left-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center transition-all duration-200 cursor-pointer text-xl z-10"
-              aria-label="إغلاق"
-            >
-              ✕
-            </button>
-
-            {/* Modal Header */}
-            <div className="mb-8">
-              <span className="text-xs uppercase tracking-widest text-[#7289da] font-bold block mb-2">
-                اختر الخدمة المطلوبة
-              </span>
-              <h2
-                className="text-3xl md:text-4xl font-bold text-white mb-2"
-                style={{ fontFamily: "'Lifta', sans-serif" }}
-              >
-                ماذا تود أن تفعل اليوم؟
-              </h2>
-              <p
-                className="text-xs md:text-sm text-gray-300 max-w-md mx-auto"
-                style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-              >
-                اختر بين تشغيل محرك مهام الديسكورد التلقائي أو ترقية وتطوير شارات ملفك الشخصي
-              </p>
-            </div>
-
-            {/* Two Big Option Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
-              {/* Option 1: المهام */}
-              <Link
-                href="/quests"
-                className="group relative rounded-2xl p-6 border border-[#5865F2]/40 bg-gradient-to-b from-[#5865F2]/15 to-transparent hover:from-[#5865F2]/30 hover:to-[#5865F2]/10 transition-all duration-300 text-right flex flex-col justify-between hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(88,101,242,0.4)] cursor-pointer"
-              >
-                <div>
-                  <div className="w-14 h-14 rounded-2xl bg-[#5865F2]/25 border border-[#5865F2]/40 flex items-center justify-center p-2.5 mb-4 group-hover:scale-110 transition-transform shadow-md overflow-hidden">
-                    <img
-                      src="/badges/quest.png"
-                      alt="المهام"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <h3
-                    className="text-2xl font-bold text-white mb-2 group-hover:text-[#7289da] transition-colors"
-                    style={{ fontFamily: "'Lifta', sans-serif" }}
-                  >
-                    المهام
-                  </h3>
-                  <p
-                    className="text-xs md:text-sm text-gray-300 leading-relaxed"
-                    style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-                  >
-                    إكمال مهام ألعاب ديسكورد تلقائياً بدون لعب واستلام الجوائز على حسابك فوراً.
-                  </p>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-start">
-                  <span className="text-xs font-bold text-[#7289da] flex items-center gap-1">
-                    <span>تشغيل المهام</span>
-                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                  </span>
-                </div>
-              </Link>
-
-              {/* Option 2: شارات (تطوير الشارات) */}
-              <Link
-                href="/badges"
-                className="group relative rounded-2xl p-6 border border-purple-500/40 bg-gradient-to-b from-purple-500/15 to-transparent hover:from-purple-500/30 hover:to-purple-500/10 transition-all duration-300 text-right flex flex-col justify-between hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(168,85,247,0.4)] cursor-pointer"
-              >
-                <div>
-                  <div className="w-14 h-14 rounded-2xl bg-purple-500/25 border border-purple-500/40 flex items-center justify-center p-2.5 mb-4 group-hover:scale-110 transition-transform shadow-md overflow-hidden">
-                    <img
-                      src="/badges/last-meadow.png"
-                      alt="الشارات"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <h3
-                    className="text-2xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors"
-                    style={{ fontFamily: "'Lifta', sans-serif" }}
-                  >
-                    الشارات
-                  </h3>
-                  <p
-                    className="text-xs md:text-sm text-gray-300 leading-relaxed"
-                    style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-                  >
-                    تطوير وترقية شارات حسابك (ساعات اللعب، تنوع الألعاب، وغيرها) لأعلى لفل ممكن.
-                  </p>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-start">
-                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1">
-                    <span>تطوير الشارات</span>
-                    <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                  </span>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── FOOTER ── */}
       <footer

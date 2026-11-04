@@ -513,13 +513,6 @@ export default function ToolPage() {
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
-            href="/badges"
-            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
-          >
-            الشارات
-          </Link>
-          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
-          <Link
             href="/faq"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
@@ -545,7 +538,7 @@ export default function ToolPage() {
             className="text-gray-300 text-sm md:text-base max-w-xl mx-auto"
             style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
           >
-            أدخل توكن الديسكورد الخاص بك لتشغيل مهمات Discord Quests تلقائياً واستلام الجوائز والشارات فوراً!
+            أدخل توكن الديسكورد الخاص بك لتشغيل مهمات Discord Quests تلقائياً واستلام الجوائز فوراً!
           </p>
         </div>
 

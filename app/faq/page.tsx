@@ -12,12 +12,7 @@ const faqs: FAQItem[] = [
   {
     question: "ما هو Quester Bot وكيف يفيدني؟",
     answer:
-      "هو أداة متطورة تمكنك من إتمام جميع مهمات (Quests) الديسكورد وتجميع المكافآت والشارات الحصرية تلقائياً وبسهولة تامة بدون الحاجة لتحميل الألعاب أو قضاء ساعات في اللعب.",
-  },
-  {
-    question: "ما هو صانع الويدجيت (Widget Maker)؟",
-    answer:
-      "أداة مخصصة لإنشاء ويدجيتس البروفايل التفاعلية في ديسكورد (Bento Board)، تتيح لك تخصيص بطاقات لعرض إحصائيات سيرفراتك، وحالة حسابك، وروابطك وشاراتك بستايل عصري وجذاب وتطبيقها على حسابك.",
+      "هو أداة متطورة تمكنك من إتمام جميع مهمات (Quests) الديسكورد وتجميع المكافآت الحصرية تلقائياً وبسهولة تامة بدون الحاجة لتحميل الألعاب أو قضاء ساعات في اللعب.",
   },
   {
     question: "هل استخدام البوت آمن على حسابي؟",
@@ -85,13 +80,6 @@ export default function FAQPage() {
           >
             المهام
           </Link>
-          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
-          <Link
-            href="/badges"
-            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
-          >
-            الشارات
-          </Link>
         </div>
       </nav>
 
@@ -148,11 +136,10 @@ export default function FAQPage() {
 
                   {/* Icon Indicator */}
                   <span
-                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 text-xs font-bold ${
-                      isOpen
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 text-xs font-bold ${isOpen
                         ? "bg-[#5865F2] text-white rotate-180 shadow-[0_0_12px_rgba(88,101,242,0.8)]"
                         : "bg-white/10 text-gray-300 group-hover:bg-white/20"
-                    }`}
+                      }`}
                   >
                     ▼
                   </span>
