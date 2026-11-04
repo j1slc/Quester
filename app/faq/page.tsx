@@ -57,9 +57,10 @@ export default function FAQPage() {
           href="/"
           className="absolute right-6 md:right-12 top-1/2 -translate-y-1/2 text-white/80 hover:text-white transition-all flex items-center gap-2 group text-sm md:text-base font-semibold select-none"
           style={{ fontFamily: "'Lifta', sans-serif" }}
+          aria-label="العودة"
         >
-          <span className="text-xl group-hover:translate-x-1 transition-transform">→</span>
-          <span>العودة</span>
+          <span className="text-2xl sm:text-xl group-hover:translate-x-1 transition-transform">→</span>
+          <span className="hidden sm:inline">العودة</span>
         </Link>
 
         {/* الروابط في المنتصف تماماً */}
