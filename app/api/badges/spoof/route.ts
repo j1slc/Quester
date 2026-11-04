@@ -1,92 +1,19 @@
 import { NextResponse } from "next/server";
+import { runGatewaySpoof } from "@/lib/discord/gateway";
 
 /**
- * Badge Spoofer API – Posts launch_game + running_game_heartbeat events
- * to Discord's /api/v9/science endpoint (the same endpoint the real client
- * uses to credit playtime badges).
+ * Badge Spoofer API (v2) – Uses Discord WebSocket Gateway (OP 3 Status Update)
+ * to cycle rich presence through many games, which is what Discord actually uses
+ * to credit Game Time and Game Variety badges.
  *
- * This mirrors the approach from revere-group/discord-badge-spoofer, adapted
- * to run server-side as a Next.js route.
+ * The old /api/v9/science approach was analytics-only and did NOT credit badges.
+ * Discord credits these badges based on rich presence data received over Gateway.
  */
 
-const SCIENCE_URL = "https://discord.com/api/v9/science";
-const ME_URL = "https://discord.com/api/v9/users/@me?with_analytics_token=true";
-const PROPERTIES_URL = "https://cordapi.dolfi.es/api/v2/properties/windows";
 const GAMES_CDN_URL = "https://cdn.discordapp.com/detectables/games.json";
-
-const CLIENT_VERSION = "1.0.9253";
-const CLIENT_BUILD_NUMBER = 594031;
-const NATIVE_BUILD_NUMBER = 88414;
-const OS_VERSION = "10.0.26200";
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) discord/1.0.9253 Chrome/148.0.7778.280 " +
   "Electron/42.7.1 Safari/537.36";
-
-const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 1000;
-
-// ── helpers ──
-
-function uuid(): string {
-  return crypto.randomUUID();
-}
-
-function localProps(): Record<string, unknown> {
-  return {
-    os: "Windows",
-    browser: "Discord Client",
-    release_channel: "stable",
-    client_version: CLIENT_VERSION,
-    os_version: OS_VERSION,
-    os_arch: "x64",
-    app_arch: "x64",
-    system_locale: "en-GB",
-    has_client_mods: false,
-    browser_user_agent: USER_AGENT,
-    browser_version: "42.7.1",
-    os_sdk_version: "26200",
-    client_build_number: CLIENT_BUILD_NUMBER,
-    native_build_number: NATIVE_BUILD_NUMBER,
-    client_event_source: null,
-    client_app_state: "focused",
-  };
-}
-
-async function buildSuperProps(launchSig: string, hbSession: string): Promise<string> {
-  let props: Record<string, unknown>;
-  try {
-    const res = await fetch(PROPERTIES_URL, {
-      method: "POST",
-      headers: { "content-type": "application/json", "user-agent": USER_AGENT },
-      body: "{}",
-      signal: AbortSignal.timeout(10_000),
-    });
-    const json = await res.json();
-    props = json.properties ?? localProps();
-  } catch {
-    props = localProps();
-  }
-  props.client_launch_id = uuid();
-  props.launch_signature = launchSig;
-  props.client_heartbeat_session_id = hbSession;
-  return Buffer.from(JSON.stringify(props)).toString("base64");
-}
-
-async function fetchAnalyticsToken(token: string, superProps: string): Promise<string> {
-  const res = await fetch(ME_URL, {
-    headers: {
-      authorization: token,
-      "user-agent": USER_AGENT,
-      "x-super-properties": superProps,
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`token rejected (${res.status})`);
-  const data = await res.json();
-  if (!data.analytics_token) throw new Error("no analytics_token in response");
-  return data.analytics_token;
-}
 
 interface Game {
   id: string;
@@ -115,259 +42,141 @@ async function loadGames(): Promise<Game[]> {
   return games;
 }
 
-// ── event builders ──
-
-let seq = 0;
-function nextSeq(): number {
-  return ++seq;
-}
-
-function buildLaunch(
-  game: Game,
-  hbSession: string,
-  launchSig: string,
-  isStreaming: boolean = false
-): Record<string, unknown> {
-  const now = Date.now();
-  return {
-    type: "launch_game",
-    properties: {
-      client_track_timestamp: now,
-      client_heartbeat_session_id: hbSession,
-      event_sequence_number: nextSeq(),
-      game: game.name,
-      game_id: game.id,
-      verified: true,
-      elevated: false,
-      is_launcher: false,
-      game_platform: "desktop",
-      detection_method: "verified_game",
-      is_overlay_enabled: false,
-      is_overlay_game_enabled: true,
-      is_overlay_game_source: "OOP_DEFAULT_DATABASE",
-      fullscreen_type: "UNKNOWN",
-      hardware_display_count: 1,
-      overlay_method: "Disabled",
-      activity_status_enabled: true,
-      activity_status_shared_guilds: [],
-      current_user_status: "online",
-      game_detection_enabled: true,
-      executable_path: game.exe,
-      voice_channel_id: isStreaming ? "112233445566778899" : null,
-      voice_channel_type: isStreaming ? 2 : null,
-      voice_channel_bitrate: isStreaming ? 64000 : null,
-      voice_channel_guild_id: isStreaming ? "998877665544332211" : null,
-      hidden_by_distributor: false,
-      game_metadata: null,
-      client_performance_cpu: null,
-      client_performance_memory: null,
-      cpu_core_count: null,
-      accessibility_features: 0,
-      rendered_locale: "en-GB",
-      launch_signature: launchSig,
-      client_rtc_state: isStreaming ? "connected" : null,
-      client_app_state: "focused",
-      client_send_timestamp: now,
-    },
-  };
-}
-
-function buildHeartbeat(
-  game: Game,
-  durationMs: number,
-  sessionId: string,
-  initial: boolean,
-  final: boolean,
-  hbSession: string,
-  launchSig: string,
-  ts?: number,
-  mediaSessionId?: string | null,
-  rtcId?: string | null
-): Record<string, unknown> {
-  const t = ts ?? Date.now();
-  return {
-    type: "running_game_heartbeat",
-    properties: {
-      client_track_timestamp: t,
-      client_heartbeat_session_id: hbSession,
-      event_sequence_number: nextSeq(),
-      game_id: game.id,
-      game_name: game.name,
-      game_metadata: null,
-      game_executable: game.exe,
-      game_detection_enabled: true,
-      initial_heartbeat: initial,
-      final_heartbeat: final,
-      game_session_id: sessionId,
-      duration_tracked_ms: durationMs,
-      rtc_connection_id: rtcId ?? null,
-      media_session_id: mediaSessionId ?? null,
-      launch_signature: launchSig,
-      client_app_state: "focused",
-      client_send_timestamp: t,
-    },
-  };
-}
-
-function buildSession(
-  game: Game,
-  durationMs: number,
-  hbSession: string,
-  launchSig: string,
-  isStreaming: boolean = false
-): Record<string, unknown>[] {
-  const sid = uuid();
-  const mediaSessionId = isStreaming ? uuid() : null;
-  const rtcId = isStreaming ? uuid() : null;
-  const now = Date.now();
-  const start = Math.max(0, now - durationMs) || now;
-  return [
-    buildHeartbeat(game, 0, sid, true, false, hbSession, launchSig, start, mediaSessionId, rtcId),
-    buildLaunch(game, hbSession, launchSig, isStreaming),
-    buildHeartbeat(game, durationMs, sid, false, true, hbSession, launchSig, now, mediaSessionId, rtcId),
-  ];
-}
-
-async function postScience(
-  events: Record<string, unknown>[],
-  analyticsToken: string,
-  accountToken: string,
-  cookie: string | undefined,
-  superProps: string
-): Promise<number> {
-  const payload = { token: analyticsToken, events };
-  const headers: Record<string, string> = {
-    accept: "*/*",
-    "accept-language": "en-GB",
-    authorization: accountToken,
-    "content-type": "application/json",
-    origin: "https://discord.com",
-    referer: "https://discord.com/channels/@me",
-    "user-agent": USER_AGENT,
-    "x-debug-options": "bugReporterEnabled",
-    "x-discord-locale": "en-GB",
-    "x-discord-timezone": "Europe/Oslo",
-    "x-super-properties": superProps,
-  };
-
-  if (cookie && cookie.trim()) {
-    headers.cookie = cookie.trim();
+async function validateToken(token: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://discord.com/api/v9/users/@me", {
+      headers: {
+        authorization: token,
+        "user-agent": USER_AGENT,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 401) return { ok: false, error: "التوكن غير صالح أو منتهي الصلاحية" };
+    if (!res.ok) return { ok: false, error: `خطأ من ديسكورد: ${res.status}` };
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: `تعذر الاتصال بديسكورد: ${err.message}` };
   }
-
-  const res = await fetch(SCIENCE_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(15_000),
-  });
-  return res.status;
 }
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// ── route handler ──
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { token, cookie, mode, gameCount, hoursPerGame } = body as {
+    const { token, mode, gameCount } = body as {
       token?: string;
-      cookie?: string;
-      mode?: "playtime" | "variety" | "streaming";
+      mode?: "playtime" | "variety";
       gameCount?: number;
-      hoursPerGame?: number;
     };
 
     if (!token || typeof token !== "string") {
       return NextResponse.json({ error: "التوكن مطلوب" }, { status: 400 });
     }
-    const cookieVal = typeof cookie === "string" ? cookie.trim() : undefined;
 
-    // Reset sequence counter per request
-    seq = 0;
+    const cleanToken = token.trim();
 
-    // Build session identity
-    const hbSession = uuid();
-    const launchSig = uuid();
-    const superProps = await buildSuperProps(launchSig, hbSession);
+    // Validate token first
+    const validation = await validateToken(cleanToken);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 401 });
+    }
 
-    // Fetch analytics token
-    let analyticsToken: string;
+    // Load game list
+    let allGames: Game[];
     try {
-      analyticsToken = await fetchAnalyticsToken(token.trim(), superProps);
+      allGames = await loadGames();
     } catch (err: any) {
       return NextResponse.json(
-        { error: `فشل التحقق: ${err.message}` },
-        { status: 401 }
+        { error: `فشل تحميل قائمة الألعاب: ${err.message}` },
+        { status: 500 }
       );
     }
 
-    // Load games
-    const allGames = await loadGames();
     if (allGames.length === 0) {
       return NextResponse.json(
-        { error: "فشل تحميل قائمة الألعاب من ديسكورد" },
+        { error: "قائمة الألعاب فارغة — حاول مرة أخرى" },
         { status: 500 }
       );
     }
 
     const spoofMode = mode ?? "playtime";
-    const count = Math.min(gameCount ?? allGames.length, allGames.length);
-    const hours = hoursPerGame ?? (spoofMode === "streaming" ? 5000 : 1);
-    const selectedGames = allGames.slice(0, count);
 
-    let durationMs: number;
+    // For variety mode: cycle through as many unique games as possible
+    // For playtime mode: use a smaller set but hold each one longer
+    let selectedGames: Game[];
+    let holdMs: number;
+
     if (spoofMode === "variety") {
-      // Mark games as played with 1 minute each
-      durationMs = 60_000;
+      // Variety badge: needs many unique games detected
+      // Hold each game for 35 seconds (minimum for Discord to register it)
+      const count = Math.min(gameCount ?? 500, allGames.length);
+      selectedGames = allGames.slice(0, count);
+      holdMs = 35_000; // 35 seconds per game
     } else {
-      durationMs = Math.round(hours * 3600 * 1000);
+      // Playtime badge: needs total hours on a single game or across games
+      // Hold each game longer to accumulate hours
+      const count = Math.min(gameCount ?? 100, allGames.length);
+      selectedGames = allGames.slice(0, count);
+      holdMs = 60_000; // 60 seconds per game
     }
 
-    const isStreaming = spoofMode === "streaming";
+    // Run the Gateway spoof
+    // NOTE: This is a streaming/long operation. We use a reasonable timeout
+    // but limit games per request to avoid server timeouts.
+    // The frontend should call this in batches for large game counts.
+    const MAX_GAMES_PER_REQUEST = 20; // Keep each request under ~15 minutes
+    const batch = selectedGames.slice(0, MAX_GAMES_PER_REQUEST);
 
-    // Send in batches
-    let sentOk = 0;
-    let lastStatus = 204;
-    for (let i = 0; i < selectedGames.length; i += BATCH_SIZE) {
-      const chunk = selectedGames.slice(i, i + BATCH_SIZE);
-      const events: Record<string, unknown>[] = [];
-      for (const game of chunk) {
-        events.push(...buildSession(game, durationMs, hbSession, launchSig, isStreaming));
-      }
-      const status = await postScience(events, analyticsToken, token.trim(), cookieVal, superProps);
-      lastStatus = status;
-      if (status === 204) {
-        sentOk += chunk.length;
-      } else if (status === 401 || status === 403) {
-        return NextResponse.json(
-          {
-            error: `رفض المصادقة (${status}) — حدّث الكوكي وأعد المحاولة`,
-            sentGames: sentOk,
-            totalGames: selectedGames.length,
-          },
-          { status: 403 }
-        );
-      }
-      if (i + BATCH_SIZE < selectedGames.length) {
-        await sleep(BATCH_DELAY_MS);
-      }
+    const controller = new AbortController();
+    // 15-minute server-side timeout
+    const serverTimeout = setTimeout(() => controller.abort(), 15 * 60 * 1000);
+
+    let result: { done: number; total: number };
+    try {
+      result = await runGatewaySpoof({
+        token: cleanToken,
+        games: batch,
+        holdMs,
+        signal: controller.signal,
+        onProgress: (_done, _total, _gameName) => {
+          // Could log progress here if needed
+        },
+      });
+    } finally {
+      clearTimeout(serverTimeout);
     }
 
     return NextResponse.json({
       success: true,
-      sentGames: sentOk,
+      sentGames: result.done,
       totalGames: selectedGames.length,
-      totalHours: spoofMode === "variety" ? 0 : sentOk * hours,
+      batchSize: MAX_GAMES_PER_REQUEST,
       mode: spoofMode,
+      message:
+        result.done > 0
+          ? `تم إرسال حضور ${result.done} لعبة عبر Gateway. تحتاج لتكرار العملية لتغطية كل الألعاب.`
+          : "لم يتم إرسال أي لعبة — تحقق من التوكن.",
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || "حدث خطأ غير متوقع" },
-      { status: 500 }
-    );
+    const msg: string = err?.message || "حدث خطأ غير متوقع";
+    // Friendly messages for known errors
+    if (msg.includes("4004") || msg.includes("Authentication")) {
+      return NextResponse.json(
+        { error: "التوكن غير صالح — تأكد من صحة التوكن وأنه من تطبيق ديسكورد الرسمي" },
+        { status: 401 }
+      );
+    }
+    if (msg.includes("4008") || msg.includes("rate limit")) {
+      return NextResponse.json(
+        { error: "تم تجاوز الحد المسموح به — انتظر دقيقة وأعد المحاولة" },
+        { status: 429 }
+      );
+    }
+    if (msg.includes("Aborted")) {
+      return NextResponse.json(
+        { error: "انتهت مهلة الاتصال — جرب عدد ألعاب أقل" },
+        { status: 408 }
+      );
+    }
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

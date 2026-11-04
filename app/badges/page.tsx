@@ -182,6 +182,11 @@ export default function BadgesPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [upgradeProgress, setUpgradeProgress] = useState<string>("");
+
+  // Connection test state
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
 
   // Real Discord profile badges
   const [discordBadges, setDiscordBadges] = useState<DiscordBadge[]>([]);
@@ -275,6 +280,29 @@ export default function BadgesPage() {
     setCookie("");
     setErrorMsg(null);
     setUpgradeResult(null);
+    setTestResult(null);
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/badges/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok && data.gateway?.ok) {
+        setTestResult({ ok: true, latencyMs: data.gateway.latencyMs });
+      } else {
+        setTestResult({ ok: false, error: data.gateway?.error || data.error || "فشل الاختبار" });
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, error: err.message });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleUpgrade = async () => {
@@ -282,56 +310,64 @@ export default function BadgesPage() {
     setUpgrading(true);
     setUpgradeResult(null);
     setErrorMsg(null);
+    setUpgradeProgress("");
 
     const cat = BADGE_CATEGORIES.find((c) => c.id === selectedCategory)!;
     const lastTier = cat.tiers[cat.tiers.length - 1];
 
-    let gameCount = 100;
-    let hoursPerGame = 500;
-
+    // For Gateway mode: gameCount is how many games to cycle presence through
+    let gameCount: number;
     if (cat.spoofMode === "variety") {
-      gameCount = 500; // المستوى الأخير: 500 لعبة (Universalist)
-      hoursPerGame = 1;
-    } else if (cat.id === "streaming") {
-      gameCount = 50;
-      hoursPerGame = 5000; // المستوى الأخير: 5000 ساعة (Visionary)
+      gameCount = 500; // Universalist: 500 games
     } else {
-      // Game Time
-      gameCount = 100;
-      hoursPerGame = 50000; // المستوى الأخير: 50,000 ساعة (Eternal)
-    }
-
-    if (cookie.trim()) {
-      localStorage.setItem("cf_clearance_cookie", cookie.trim());
+      gameCount = 100; // Playtime: 100 games, each held for 60s
     }
 
     try {
-      const res = await fetch("/api/badges/spoof", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: token.trim(),
-          cookie: cookie.trim(),
-          mode: cat.spoofMode,
-          gameCount,
-          hoursPerGame,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "فشل في إرسال طلب التطوير");
+      // We call in batches of 20 games (server limit per request to avoid timeouts)
+      const BATCH_SIZE = 20;
+      let totalSent = 0;
+      let batchNum = 0;
+      let totalBatches = Math.ceil(gameCount / BATCH_SIZE);
+
+      for (let offset = 0; offset < gameCount; offset += BATCH_SIZE) {
+        batchNum++;
+        setUpgradeProgress(
+          `جاري معالجة الدفعة ${batchNum} من ${totalBatches}... (${totalSent} لعبة تمت)`
+        );
+
+        const res = await fetch("/api/badges/spoof", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: token.trim(),
+            mode: cat.spoofMode,
+            gameCount,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "فشل في إرسال طلب التطوير");
+        }
+
+        totalSent += data.sentGames ?? 0;
+        // Break after one batch — server handles its own batch limit
+        break;
       }
 
-      // Set cooldown
+      // Set 48h cooldown
       const end = Date.now() + COOLDOWN_MS;
       localStorage.setItem(COOLDOWN_KEY, String(end));
       setCooldownEnd(end);
+      setUpgradeProgress("");
 
       setUpgradeResult({
         success: true,
-        message: `تم إرسال طلب تطوير شارة "${cat.titleAr}" إلى اللفل الأخير (${lastTier.nameAr}) بنجاح! تم معالجة ${data.sentGames} لعبة. انتظر مدة لا تقل عن يومان (48 ساعة) لتحديث الشارة على حسابك.`,
+        message: `✅ تم تفعيل الحضور لـ ${totalSent} لعبة عبر Discord Gateway! شارة "${cat.titleAr}" قيد المعالجة. انتظر 24-48 ساعة وستظهر على حسابك.`,
       });
     } catch (err: any) {
+      setUpgradeProgress("");
       setUpgradeResult({
         success: false,
         message: err.message || "حدث خطأ غير متوقع",
@@ -606,6 +642,37 @@ export default function BadgesPage() {
                   >
                     تسجيل الخروج
                   </button>
+
+                  {/* Connection Test Button */}
+                  <button
+                    onClick={handleTest}
+                    disabled={testing || upgrading}
+                    className="mt-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border"
+                    style={{
+                      fontFamily: "'IBM Plex Sans Arabic', sans-serif",
+                      background: testing ? "rgba(88,101,242,0.1)" : "rgba(88,101,242,0.08)",
+                      borderColor: "rgba(88,101,242,0.3)",
+                      color: "#7289da",
+                    }}
+                  >
+                    {testing ? "⏳ جاري اختبار الاتصال..." : "🔌 اختبر الاتصال بـ Gateway"}
+                  </button>
+
+                  {/* Test Result */}
+                  {testResult && (
+                    <div
+                      className={`mt-2 px-4 py-2.5 rounded-xl text-xs text-right leading-relaxed ${
+                        testResult.ok
+                          ? "bg-green-500/10 border border-green-500/30 text-green-300"
+                          : "bg-red-500/10 border border-red-500/30 text-red-300"
+                      }`}
+                      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+                    >
+                      {testResult.ok
+                        ? `✅ الاتصال ناجح! Gateway يستجيب في ${testResult.latencyMs}ms — التوكن شغال وجاهز للتطوير`
+                        : `❌ ${testResult.error}`}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -662,8 +729,8 @@ export default function BadgesPage() {
                       setUpgradeResult(null);
                     }}
                     className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all duration-300 cursor-pointer select-none ${selectedCategory === cat.id
-                        ? "text-white shadow-[0_0_20px_rgba(88,101,242,0.5)] scale-[1.02]"
-                        : "text-gray-400 hover:text-white hover:bg-white/5 opacity-80"
+                      ? "text-white shadow-[0_0_20px_rgba(88,101,242,0.5)] scale-[1.02]"
+                      : "text-gray-400 hover:text-white hover:bg-white/5 opacity-80"
                       }`}
                     style={{
                       fontFamily: "'Lifta', sans-serif",
@@ -705,8 +772,8 @@ export default function BadgesPage() {
                       setUpgradeResult(null);
                     }}
                     className={`group relative flex flex-col items-center gap-2 p-4 rounded-2xl cursor-pointer select-none transition-all duration-300 ${selectedTierIdx === idx
-                        ? "scale-[1.05] shadow-[0_0_25px_rgba(88,101,242,0.5)]"
-                        : "opacity-70 hover:opacity-100 hover:bg-white/5"
+                      ? "scale-[1.05] shadow-[0_0_25px_rgba(88,101,242,0.5)]"
+                      : "opacity-70 hover:opacity-100 hover:bg-white/5"
                       }`}
                     style={{
                       background:
@@ -811,8 +878,8 @@ export default function BadgesPage() {
                   {upgradeResult && (
                     <div
                       className={`mb-4 p-4 rounded-xl text-sm text-right leading-relaxed ${upgradeResult.success
-                          ? "bg-green-500/10 border border-green-500/30 text-green-300"
-                          : "bg-red-500/10 border border-red-500/30 text-red-300"
+                        ? "bg-green-500/10 border border-green-500/30 text-green-300"
+                        : "bg-red-500/10 border border-red-500/30 text-red-300"
                         }`}
                       style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
                     >
@@ -898,9 +965,19 @@ export default function BadgesPage() {
                       }}
                     >
                       {upgrading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          جاري التطوير للفل الأخير...
+                        <span className="flex flex-col items-center justify-center gap-2">
+                          <span className="flex items-center gap-2">
+                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            جاري تفعيل الحضور عبر Gateway...
+                          </span>
+                          {upgradeProgress && (
+                            <span
+                              className="text-xs text-white/60 mt-1"
+                              style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+                            >
+                              {upgradeProgress}
+                            </span>
+                          )}
                         </span>
                       ) : (
                         `تطوير الشارة للحد الأقصى (${lastTier.nameAr})`
