@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { ClientGatewaySpoofer, fetchDiscordGames, ClientSpoofProgress } from "@/lib/discord/client-gateway";
 
 /* ─── Discord user (same shape as /api/auth/token returns) ─── */
 interface DiscordUser {
@@ -183,6 +184,8 @@ export default function BadgesPage() {
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ success: boolean; message: string } | null>(null);
   const [upgradeProgress, setUpgradeProgress] = useState<string>("");
+  const [spoofProgress, setSpoofProgress] = useState<ClientSpoofProgress | null>(null);
+  const spooferRef = useRef<ClientGatewaySpoofer | null>(null);
 
   // Connection test state
   const [testing, setTesting] = useState(false);
@@ -305,75 +308,78 @@ export default function BadgesPage() {
     }
   };
 
+  const handleStop = () => {
+    if (spooferRef.current) {
+      spooferRef.current.stop();
+      setUpgrading(false);
+      setSpoofProgress(null);
+      setUpgradeProgress("");
+    }
+  };
+
   const handleUpgrade = async () => {
     setShowConfirm(false);
     setUpgrading(true);
     setUpgradeResult(null);
     setErrorMsg(null);
+    setSpoofProgress(null);
     setUpgradeProgress("");
 
     const cat = BADGE_CATEGORIES.find((c) => c.id === selectedCategory)!;
     const lastTier = cat.tiers[cat.tiers.length - 1];
 
-    // For Gateway mode: gameCount is how many games to cycle presence through
-    let gameCount: number;
-    if (cat.spoofMode === "variety") {
-      gameCount = 500; // Universalist: 500 games
-    } else {
-      gameCount = 100; // Playtime: 100 games, each held for 60s
-    }
-
     try {
-      // We call in batches of 20 games (server limit per request to avoid timeouts)
-      const BATCH_SIZE = 20;
-      let totalSent = 0;
-      let batchNum = 0;
-      let totalBatches = Math.ceil(gameCount / BATCH_SIZE);
+      setUpgradeProgress("جاري تحميل قائمة الألعاب من ديسكورد...");
+      const allGames = await fetchDiscordGames();
 
-      for (let offset = 0; offset < gameCount; offset += BATCH_SIZE) {
-        batchNum++;
-        setUpgradeProgress(
-          `جاري معالجة الدفعة ${batchNum} من ${totalBatches}... (${totalSent} لعبة تمت)`
-        );
+      const gameCount = cat.spoofMode === "variety" ? 500 : 100;
+      const holdSeconds = cat.spoofMode === "variety" ? 35 : 60;
+      const selectedGames = allGames.slice(0, Math.min(gameCount, allGames.length));
 
-        const res = await fetch("/api/badges/spoof", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: token.trim(),
-            mode: cat.spoofMode,
-            gameCount,
-          }),
-        });
+      setUpgradeProgress("جاري الاتصال بـ Discord Gateway...");
+      const spoofer = new ClientGatewaySpoofer();
+      spooferRef.current = spoofer;
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || "فشل في إرسال طلب التطوير");
-        }
-
-        totalSent += data.sentGames ?? 0;
-        // Break after one batch — server handles its own batch limit
-        break;
-      }
-
-      // Set 48h cooldown
-      const end = Date.now() + COOLDOWN_MS;
-      localStorage.setItem(COOLDOWN_KEY, String(end));
-      setCooldownEnd(end);
-      setUpgradeProgress("");
-
-      setUpgradeResult({
-        success: true,
-        message: `✅ تم تفعيل الحضور لـ ${totalSent} لعبة عبر Discord Gateway! شارة "${cat.titleAr}" قيد المعالجة. انتظر 24-48 ساعة وستظهر على حسابك.`,
+      spoofer.start({
+        token: token.trim(),
+        games: selectedGames,
+        holdSeconds,
+        onProgress: (p) => {
+          setSpoofProgress(p);
+          setUpgradeProgress(
+            `اللعبة ${p.current} من ${p.total}: ${p.gameName} (متبقي ${p.secondsRemaining} ثانية)`
+          );
+        },
+        onComplete: (done) => {
+          setUpgrading(false);
+          setSpoofProgress(null);
+          setUpgradeProgress("");
+          const end = Date.now() + COOLDOWN_MS;
+          localStorage.setItem(COOLDOWN_KEY, String(end));
+          setCooldownEnd(end);
+          setUpgradeResult({
+            success: true,
+            message: `✅ تم محاكاة لعب ${done} لعبة بنجاح عبر Discord Gateway! شارة "${cat.titleAr}" قيد المعالجة في ديسكورد. انتظر 24-48 ساعة لتحديث الشارة على حسابك.`,
+          });
+        },
+        onError: (err) => {
+          setUpgrading(false);
+          setSpoofProgress(null);
+          setUpgradeProgress("");
+          setUpgradeResult({
+            success: false,
+            message: err,
+          });
+        },
       });
     } catch (err: any) {
+      setUpgrading(false);
+      setSpoofProgress(null);
       setUpgradeProgress("");
       setUpgradeResult({
         success: false,
         message: err.message || "حدث خطأ غير متوقع",
       });
-    } finally {
-      setUpgrading(false);
     }
   };
 
@@ -404,7 +410,44 @@ export default function BadgesPage() {
     ...userBadges.map((b) => ({ id: String(b.flag), label: b.label, labelAr: b.labelAr, description: b.labelAr, icon: b.icon })),
   ];
 
-  const displayedBadges = discordBadges.length > 0
+  // Calculate Account Age badge from Snowflake user ID
+  const accountAgeBadge = (() => {
+    if (!user?.id) return null;
+    try {
+      const idBig = BigInt(user.id);
+      const createdAtMs = Number((idBig / BigInt(4194304)) + BigInt("1420070400000"));
+      const ageYears = Math.floor((Date.now() - createdAtMs) / (365.25 * 24 * 60 * 60 * 1000));
+      if (ageYears >= 1) {
+        const tierIdx = Math.min(ageYears - 1, ACCOUNT_AGE_TIERS.length - 1);
+        const tier = ACCOUNT_AGE_TIERS[tierIdx];
+        return {
+          id: `account_age_${ageYears}`,
+          label: `${tier.name} (${ageYears} ${ageYears > 1 ? "years" : "year"})`,
+          labelAr: `${tier.nameAr} (${ageYears} ${ageYears > 2 ? "سنوات" : "سنة"})`,
+          description: `عضو منذ ${ageYears} ${ageYears > 2 ? "سنوات" : "سنة"} (${tier.nameAr})`,
+          icon: tier.icon,
+        };
+      }
+    } catch (_) {}
+    return null;
+  })();
+
+  // Legacy username badge
+  const legacyUsernameBadge = (() => {
+    if (!user) return null;
+    if (user.discriminator && user.discriminator !== "0" && user.discriminator !== "0000") {
+      return {
+        id: "legacy_username",
+        label: `Originally known as ${user.username}#${user.discriminator}`,
+        labelAr: `كان يُعرف بـ ${user.username}#${user.discriminator}`,
+        description: `كان يُعرف بـ ${user.username}#${user.discriminator}`,
+        icon: "/badges/username.png",
+      };
+    }
+    return null;
+  })();
+
+  const rawBadges = discordBadges.length > 0
     ? discordBadges.map((b) => ({
       id: b.id,
       label: b.description || b.id,
@@ -413,6 +456,15 @@ export default function BadgesPage() {
       icon: b.icon,
     }))
     : fallbackBadges;
+
+  // Merge account age and legacy username if not already included
+  const displayedBadges = [...rawBadges];
+  if (accountAgeBadge && !displayedBadges.some(b => b.id.includes("account_age") || b.label.toLowerCase().includes("member since") || b.description.includes("عضو منذ"))) {
+    displayedBadges.push(accountAgeBadge);
+  }
+  if (legacyUsernameBadge && !displayedBadges.some(b => b.id.includes("legacy_username") || b.label.toLowerCase().includes("originally known as"))) {
+    displayedBadges.push(legacyUsernameBadge);
+  }
 
   return (
     <main
@@ -947,41 +999,60 @@ export default function BadgesPage() {
                         انتظر حتى ينتهي الوقت لتتمكن من التطوير مرة أخرى
                       </p>
                     </div>
+                  ) : upgrading ? (
+                    <div className="w-full p-5 rounded-2xl bg-[#5865F2]/10 border border-[#5865F2]/30 flex flex-col items-center gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-[#5865F2] rounded-full animate-spin" />
+                        <span className="font-bold text-white text-base" style={{ fontFamily: "'Lifta', sans-serif" }}>
+                          {spoofProgress ? `جاري محاكاة اللعب عبر Gateway...` : `جاري الاتصال بـ Gateway...`}
+                        </span>
+                      </div>
+
+                      {spoofProgress && (
+                        <div className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-right">
+                          <div className="flex items-center justify-between text-xs text-white/90 mb-1.5 font-semibold">
+                            <span className="truncate max-w-[200px] text-emerald-400">🎮 {spoofProgress.gameName}</span>
+                            <span>اللعبة {spoofProgress.current} من {spoofProgress.total}</span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden mb-2">
+                            <div
+                              className="bg-gradient-to-r from-[#5865F2] to-emerald-400 h-full transition-all duration-300 rounded-full"
+                              style={{
+                                width: `${Math.round((spoofProgress.current / spoofProgress.total) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="text-center text-[11px] text-[#7289da] font-sans">
+                            ⏳ الانتقال للعبة التالية بعد: <strong className="text-white">{spoofProgress.secondsRemaining}</strong> ثانية
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        className="px-5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-bold border border-red-500/30 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                        style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
+                      >
+                        ⛔ إيقاف مؤقت وحفظ ما تم إنجازه
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={() => {
                         setErrorMsg(null);
                         setShowConfirm(true);
                       }}
-                      disabled={upgrading}
                       className="w-full py-4 rounded-xl font-bold text-white cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{
                         fontFamily: "'Lifta', sans-serif",
                         fontSize: "17px",
-                        background: upgrading
-                          ? "rgba(88,101,242,0.3)"
-                          : "linear-gradient(135deg, #5865F2, #404EED)",
-                        boxShadow: upgrading ? "none" : "0 6px 20px rgba(88,101,242,0.4)",
+                        background: "linear-gradient(135deg, #5865F2, #404EED)",
+                        boxShadow: "0 6px 20px rgba(88,101,242,0.4)",
                       }}
                     >
-                      {upgrading ? (
-                        <span className="flex flex-col items-center justify-center gap-2">
-                          <span className="flex items-center gap-2">
-                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            جاري تفعيل الحضور عبر Gateway...
-                          </span>
-                          {upgradeProgress && (
-                            <span
-                              className="text-xs text-white/60 mt-1"
-                              style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
-                            >
-                              {upgradeProgress}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        `تطوير الشارة للحد الأقصى (${lastTier.nameAr})`
-                      )}
+                      تطوير الشارة للحد الأقصى ({lastTier.nameAr})
                     </button>
                   )}
 
