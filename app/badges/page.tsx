@@ -405,8 +405,12 @@ export default function BadgesPage() {
   const userFlags = (user?.public_flags ?? 0) | (user?.flags ?? 0);
   const userBadges = FLAG_BADGES.filter((b) => (userFlags & b.flag) !== 0);
   const premiumBadge = PREMIUM_BADGES.find((b) => b.type === (user?.premium_type ?? 0));
+  const hasNitro = Boolean(premiumBadge) || Boolean(user?.avatar_decoration_data) || Boolean(user?.banner);
+
   const fallbackBadges = [
-    ...(premiumBadge ? [{ id: "nitro", label: premiumBadge.label, labelAr: premiumBadge.labelAr, description: premiumBadge.labelAr, icon: premiumBadge.icon }] : []),
+    { id: "game_streaming", label: "Streaming", labelAr: "بث مباشر", description: "Streaming", icon: "/badges/streaming/newcomer.svg" },
+    ...(hasNitro ? [{ id: "nitro", label: "Discord Nitro", labelAr: "ديسكورد نيترو", description: "Discord Nitro", icon: "/badges/discord-nitro.svg" }] : []),
+    ...(!userBadges.some(b => b.flag === (1 << 22)) ? [{ id: "active_developer", label: "Active Developer", labelAr: "مطور نشط", description: "Active Developer", icon: "/badges/active-developer.svg" }] : []),
     ...userBadges.map((b) => ({ id: String(b.flag), label: b.label, labelAr: b.labelAr, description: b.labelAr, icon: b.icon })),
   ];
 
@@ -432,15 +436,21 @@ export default function BadgesPage() {
     return null;
   })();
 
-  // Legacy username badge
+  // Legacy username badge (#)
   const legacyUsernameBadge = (() => {
     if (!user) return null;
-    if (user.discriminator && user.discriminator !== "0" && user.discriminator !== "0000") {
+    const hasLegacy =
+      user.discriminator === "0" ||
+      Boolean((user as any).legacy_username) ||
+      Boolean(user.global_name && user.global_name !== user.username);
+
+    if (hasLegacy) {
+      const orig = (user as any).legacy_username || user.username;
       return {
         id: "legacy_username",
-        label: `Originally known as ${user.username}#${user.discriminator}`,
-        labelAr: `كان يُعرف بـ ${user.username}#${user.discriminator}`,
-        description: `كان يُعرف بـ ${user.username}#${user.discriminator}`,
+        label: `Originally known as ${orig}`,
+        labelAr: `Originally known as ${orig}`,
+        description: `Originally known as ${orig}`,
         icon: "/badges/username.png",
       };
     }
@@ -457,7 +467,8 @@ export default function BadgesPage() {
     }))
     : fallbackBadges;
 
-  // Merge account age and legacy username if not already included
+  // Merge and deduplicate
+  const seenBadgeKeys = new Set<string>();
   const displayedBadges = [...rawBadges];
   if (accountAgeBadge && !displayedBadges.some(b => b.id.includes("account_age") || b.label.toLowerCase().includes("member since") || b.description.includes("عضو منذ"))) {
     displayedBadges.push(accountAgeBadge);
@@ -465,6 +476,13 @@ export default function BadgesPage() {
   if (legacyUsernameBadge && !displayedBadges.some(b => b.id.includes("legacy_username") || b.label.toLowerCase().includes("originally known as"))) {
     displayedBadges.push(legacyUsernameBadge);
   }
+
+  const finalBadges = displayedBadges.filter(b => {
+    const key = b.id || b.label;
+    if (seenBadgeKeys.has(key)) return false;
+    seenBadgeKeys.add(key);
+    return true;
+  });
 
   return (
     <main
@@ -634,9 +652,9 @@ export default function BadgesPage() {
                   </p>
 
                   {/* Discord Official-Style Badge Pill Bar */}
-                  {displayedBadges.length > 0 && (
+                  {finalBadges.length > 0 && (
                     <div className="mt-3.5 flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-[#070716]/90 border border-white/10 w-fit">
-                      {displayedBadges.map((b, i) => (
+                      {finalBadges.map((b, i) => (
                         <div
                           key={`${b.id}-${i}`}
                           className="group relative flex items-center justify-center p-1 rounded-lg hover:bg-white/10 transition-all cursor-pointer"
@@ -659,13 +677,13 @@ export default function BadgesPage() {
                   )}
 
                   {/* Badge list summary */}
-                  {displayedBadges.length > 0 && (
+                  {finalBadges.length > 0 && (
                     <div className="mt-4 pt-3 border-t border-white/5">
                       <p className="text-xs text-gray-400 mb-2 text-left" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
-                        الشارات المكتشفة ({displayedBadges.length})
+                        الشارات المكتشفة ({finalBadges.length})
                       </p>
                       <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
-                        {displayedBadges.map((b, i) => (
+                        {finalBadges.map((b, i) => (
                           <div
                             key={`detail-${b.id}-${i}`}
                             className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/5 text-left"
@@ -680,7 +698,7 @@ export default function BadgesPage() {
                     </div>
                   )}
 
-                  {displayedBadges.length === 0 && (
+                  {finalBadges.length === 0 && (
                     <p className="mt-4 text-xs text-gray-500 text-left" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
                       لا توجد شارات ظاهرة حالياً على حسابك
                     </p>

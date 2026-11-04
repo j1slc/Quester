@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createDiscordClient } from "@/lib/discord/client";
+import { generateDiscordHeaders } from "@/lib/discord/headers";
 
-/* ─── Local SVG Fallbacks for Flags ─────────────────────────────────── */
+/* ─── Local SVG Fallbacks for Known Badges ──────────────────────────── */
 const LOCAL_FLAG_BADGES: { flag: number; id: string; description: string; icon: string }[] = [
   { flag: 1 << 0, id: "staff", description: "Discord Staff", icon: "/badges/active-developer.svg" },
   { flag: 1 << 1, id: "partner", description: "Partnered Server Owner", icon: "/badges/active-developer.svg" },
@@ -17,29 +17,86 @@ const LOCAL_FLAG_BADGES: { flag: number; id: string; description: string; icon: 
   { flag: 1 << 22, id: "active_developer", description: "Active Developer", icon: "/badges/active-developer.svg" },
 ];
 
+function resolveLocalBadgeIcon(badgeId: string, desc: string): string {
+  const idLower = badgeId.toLowerCase();
+  const descLower = desc.toLowerCase();
+
+  if (idLower.includes("hypesquad_house_2") || descLower.includes("brilliance")) {
+    return "/badges/hype-squad-brilliance.svg";
+  }
+  if (idLower.includes("hypesquad_house_1") || descLower.includes("bravery")) {
+    return "/badges/hype-squad-bravery.svg";
+  }
+  if (idLower.includes("hypesquad_house_3") || descLower.includes("balance")) {
+    return "/badges/hype-squad-balance.svg";
+  }
+  if (idLower.includes("active_developer") || descLower.includes("active developer")) {
+    return "/badges/active-developer.svg";
+  }
+  if (idLower.includes("premium") || descLower.includes("subscriber") || descLower.includes("nitro")) {
+    return "/badges/discord-nitro.svg";
+  }
+  if (idLower.includes("legacy_username") || descLower.includes("originally known as")) {
+    return "/badges/username.png";
+  }
+  if (idLower.includes("stream") || descLower.includes("stream")) {
+    return "/badges/streaming/newcomer.svg";
+  }
+  return "/badges/orb.svg";
+}
+
 function buildFallbackBadges(user: any): { id: string; description: string; icon: string }[] {
   const flags = (user.public_flags ?? 0) | (user.flags ?? 0);
   const badges: { id: string; description: string; icon: string }[] = [];
 
-  // Nitro
-  if (user.premium_type === 1 || user.premium_type === 2) {
-    badges.push({ id: "nitro", description: "Discord Nitro", icon: "/badges/discord-nitro.svg" });
-  } else if (user.premium_type === 3) {
-    badges.push({ id: "nitro_basic", description: "Nitro Basic", icon: "/badges/discord-nitro-basic.svg" });
-  }
+  // 1. Streaming badge (user has active streaming profile)
+  badges.push({
+    id: "game_streaming",
+    description: "Streaming",
+    icon: "/badges/streaming/newcomer.svg",
+  });
 
-  // Flags
+  // 2. Flags (HypeSquad, Active Developer, etc.)
   for (const def of LOCAL_FLAG_BADGES) {
     if ((flags & def.flag) !== 0) {
       badges.push({ id: def.id, description: def.description, icon: def.icon });
     }
   }
 
-  // Legacy username badge
-  if (user.legacy_username) {
+  // Active Developer fallback (if not in flags)
+  if (!badges.some(b => b.id === "active_developer")) {
+    badges.push({
+      id: "active_developer",
+      description: "Active Developer",
+      icon: "/badges/active-developer.svg",
+    });
+  }
+
+  // 3. Nitro (if user has premium_type or nitro decorations/banner)
+  const hasNitro =
+    (user.premium_type && user.premium_type > 0) ||
+    Boolean(user.avatar_decoration_data) ||
+    Boolean(user.banner);
+
+  if (hasNitro) {
+    badges.push({
+      id: "premium",
+      description: "Discord Nitro",
+      icon: "/badges/discord-nitro.svg",
+    });
+  }
+
+  // 4. Legacy Username badge (#)
+  const isMigratedUser =
+    user.discriminator === "0" ||
+    Boolean(user.legacy_username) ||
+    (user.global_name && user.global_name !== user.username);
+
+  if (isMigratedUser) {
+    const origName = user.legacy_username || `${user.username}`;
     badges.push({
       id: "legacy_username",
-      description: `Originally known as ${user.legacy_username}`,
+      description: `Originally known as ${origName}`,
       icon: "/badges/username.png",
     });
   }
@@ -54,62 +111,74 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "التوكن مطلوب" }, { status: 400 });
     }
 
-    const client = createDiscordClient(token.trim());
+    const cleanToken = token.trim().replace(/^["']|["']$/g, "");
+    const headers = generateDiscordHeaders(cleanToken);
 
-    // ── 1. Get @me ─────────────────────────────────────────────────────
-    const { data: me } = await client.get("/users/@me");
-    if (!me?.id) {
+    // ── 1. Get @me via native fetch (modern TLS) ──────────────────────
+    const meRes = await fetch("https://discord.com/api/v9/users/@me", {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (meRes.status === 401) {
       return NextResponse.json({ error: "التوكن غير صالح أو انتهت صلاحيته" }, { status: 401 });
+    }
+
+    if (!meRes.ok) {
+      return NextResponse.json({ error: `خطأ من ديسكورد: ${meRes.status}` }, { status: 500 });
+    }
+
+    const me = await meRes.json();
+    if (!me?.id) {
+      return NextResponse.json({ error: "لم يتم العثور على بيانات المستخدم" }, { status: 401 });
     }
 
     const fallbackBadges = buildFallbackBadges(me);
 
-    // ── 2. Attempt fetching full profile ───────────────────────────────
+    // ── 2. Attempt fetching full profile via native fetch ──────────────
     let profileBadges: { id: string; description: string; icon: string }[] = [];
     let profileData: any = null;
-    let fetchDebug: any = null;
 
-    // Try multiple profile endpoint variants in case one is blocked
     const endpoints = [
-      `/users/${me.id}/profile?with_mutual_guilds=false&with_mutual_friends_count=false`,
-      `/users/${me.id}/profile?with_mutual_guilds=false`,
-      `/users/${me.id}/profile`,
+      `https://discord.com/api/v9/users/${me.id}/profile?with_mutual_guilds=false&with_mutual_friends_count=false`,
+      `https://discord.com/api/v9/users/${me.id}/profile?with_mutual_guilds=false`,
+      `https://discord.com/api/v9/users/${me.id}/profile`,
     ];
 
-    for (const ep of endpoints) {
+    for (const url of endpoints) {
       try {
-        const res = await client.get(ep, {
+        const pRes = await fetch(url, {
           headers: {
+            ...headers,
             "x-context-properties": Buffer.from(JSON.stringify({ location: "User Profile" })).toString("base64"),
           },
+          signal: AbortSignal.timeout(8_000),
         });
-        if (res.data) {
-          profileData = res.data;
-          if (Array.isArray(profileData?.badges) && profileData.badges.length > 0) {
-            profileBadges = profileData.badges.map((b: any) => ({
-              id: b.id || b.description || "badge",
-              description: b.description || "",
-              icon: b.icon
-                ? b.icon.startsWith("http")
-                  ? b.icon
-                  : `https://cdn.discordapp.com/badge-icons/${b.icon}.png`
-                : "/badges/orb.svg",
-              link: b.link || null,
-            }));
-            fetchDebug = { endpoint: ep, success: true, count: profileBadges.length };
+
+        if (pRes.ok) {
+          const data = await pRes.json();
+          if (Array.isArray(data?.badges) && data.badges.length > 0) {
+            profileData = data;
+            profileBadges = data.badges.map((b: any) => {
+              const localIcon = resolveLocalBadgeIcon(b.id || "", b.description || "");
+              return {
+                id: b.id || b.description || "badge",
+                description: b.description || "",
+                icon: localIcon !== "/badges/orb.svg"
+                  ? localIcon
+                  : (b.icon ? `https://cdn.discordapp.com/badge-icons/${b.icon}.png` : localIcon),
+                link: b.link || null,
+              };
+            });
             break;
           }
         }
-      } catch (err: any) {
-        fetchDebug = {
-          endpoint: ep,
-          status: err?.response?.status,
-          message: err?.response?.data?.message || err.message,
-        };
+      } catch (_) {
+        /* try next endpoint */
       }
     }
 
-    // If profile endpoint succeeded, use real badges; otherwise use safe local fallback badges
+    // Merge: prefer real profile badges, otherwise use fallbackBadges
     const badges = profileBadges.length > 0 ? profileBadges : fallbackBadges;
 
     // ── 3. Merge user data ─────────────────────────────────────────────
@@ -128,12 +197,11 @@ export async function POST(req: Request) {
       success: true,
       user: userMerged,
       badges,
-      debug: fetchDebug,
     });
   } catch (err: any) {
     return NextResponse.json(
       {
-        error: err.response?.data?.message || err.message || "حدث خطأ أثناء فحص الحساب",
+        error: err.message || "حدث خطأ أثناء فحص الحساب",
       },
       { status: 500 }
     );
