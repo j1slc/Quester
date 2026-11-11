@@ -152,6 +152,10 @@ export async function POST(req: Request) {
           completed: curProgress >= targetSeconds,
         });
 
+        // Number of consecutive rounds where Discord returned no usable progress data
+        const MAX_MISSING_PROGRESS = 5;
+        let missingProgressCount = 0;
+
         while (!isAborted) {
           let responseData: any = null;
 
@@ -198,6 +202,7 @@ export async function POST(req: Request) {
           }
 
           if (extracted.current !== null) {
+            missingProgressCount = 0;
             curProgress = extracted.current;
             const isCompleted = extracted.completed || curProgress >= targetSeconds;
             const percent = isCompleted ? 100 : Math.min(100, Math.floor((curProgress / targetSeconds) * 100));
@@ -221,26 +226,16 @@ export async function POST(req: Request) {
               break;
             }
           } else {
-            // Fallback increment (server unreachable)
-            curProgress += isVideoTask ? 5 : 20;
-            const isCompleted = curProgress >= targetSeconds;
-            const percent = Math.min(100, Math.floor((curProgress / targetSeconds) * 100));
-
-            sendEvent("progress", {
-              current: curProgress,
-              target: targetSeconds,
-              percent,
-              completed: isCompleted,
-            });
-
+            // Discord returned no usable progress. Never invent progress or report
+            // completion without a confirmation from Discord itself.
+            missingProgressCount += 1;
             sendEvent("log", {
-              message: `[محاكاة] التقدم: ${curProgress}s / ${targetSeconds}s (${percent}%)`,
+              message: `⚠️ لم يصل تقدم من ديسكورد (محاولة ${missingProgressCount}/${MAX_MISSING_PROGRESS}).`,
             });
 
-            if (isCompleted) {
-              console.log(`[RUNNER] Quest ${questId} simulation completed! Sending completed event.`);
-              sendEvent("completed", {
-                message: "🎉 تم الوصول للهدف!",
+            if (missingProgressCount >= MAX_MISSING_PROGRESS) {
+              sendEvent("error", {
+                message: "❌ تعذّر الحصول على تقدم المهمة من ديسكورد. تحقق من حالة المهمة داخل تطبيق ديسكورد ثم أعد المحاولة.",
               });
               break;
             }

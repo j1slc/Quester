@@ -1,28 +1,41 @@
-# Quester — Discord Quests Platform
+# Quester — أداة لإكمال مهام ديسكورد (Discord Quests)
 
-A modern, high-performance showcase website for automated Discord Quests. Built with Next.js, React, and Tailwind CSS.
+موقع مبني بـ Next.js يتصل بحساب ديسكورد عن طريق **التوكن (Token)** الخاص بالمستخدم، ويعرض المهام (Quests) المتاحة، ويسجّل الحساب فيها، ثم يرسل نبضات تقدم (heartbeat / video-progress) لسيرفرات ديسكورد حتى تكتمل المهمة. يحتوي أيضاً على صفحة لتغيير شارة HypeSquad.
 
-## 🚀 Features
-- **Modern Cosmic Aesthetic**: Rich dark gradients, glassmorphism, and responsive typography.
-- **Fast & Responsive**: Fully responsive layout optimized for desktop and mobile devices.
-- **Interactive Showcase**: Simulated real-time quest progress, reward badges, and status logs.
+> ⚠️ **تنبيه مهم:** استخدام توكن الحساب في أدوات خارجية وإرسال تقدم مهام بدون لعب أو مشاهدة فعلية يخالف شروط استخدام ديسكورد (ToS)، وقد يؤدي إلى تقييد الحساب أو حظره. المسؤولية على من يستخدم الأداة.
 
-## 🛠️ Tech Stack
-- **Framework**: [Next.js](https://nextjs.org/) (App Router)
-- **Styling**: Tailwind CSS & Vanilla CSS
-- **Deployment**: [Vercel](https://vercel.com)
+## كيف يعمل
 
-## 💻 Getting Started Locally
+1. المستخدم يلصق التوكن في الموقع (`/quests` أو `/badges`).
+2. مسارات الـ API في `app/api/` ترسل الطلبات إلى `https://discord.com/api/v9`، مع هيدرز تحاكي تطبيق ديسكورد الرسمي (`lib/discord/headers.ts`).
+3. `/api/quests/list` يجلب المهام، و`/api/quests/enroll` يسجّل الحساب فيها.
+4. `/api/quests/runner` يرسل نبضات التقدم كل 5 أو 20 ثانية ويبث التقدم للواجهة عبر Server-Sent Events. تُعتبر المهمة مكتملة **فقط** عندما يؤكد ديسكورد ذلك؛ وإذا لم يصل تقدم من ديسكورد لعدة محاولات متتالية تتوقف الجلسة بخطأ.
+5. `/api/badges` يفحص أو يغيّر أو يزيل شارة HypeSquad.
+
+## أمان التوكن
+
+- التوكن يُرسل في جسم كل طلب إلى سيرفر الموقع ثم إلى ديسكورد فقط. لا يُخزَّن على السيرفر ولا يُرسل لأي جهة أخرى.
+- عند تفعيل "تذكرني" يُحفظ التوكن في `localStorage` في متصفح المستخدم **كنص عادي**.
+- التوكن يعطي تحكماً كاملاً بالحساب. لا تشاركه، ولا تستخدم الأداة على نسخة منشورة لا تثق بمن يديرها.
+
+## هيكل المشروع
+
+- `app/` — الصفحات (الرئيسية، quests، badges، faq، how-it-works) ومسارات الـ API
+- `lib/discord/client.ts` — التعامل مع API ديسكورد (المهام، التسجيل، HypeSquad)
+- `lib/discord/headers.ts` — توليد هيدرز الطلبات
+- `public/badges/` — أيقونات الشارات
+
+## التقنيات
+
+Next.js (App Router)، React، Tailwind CSS، axios.
+
+## التشغيل محلياً
 
 ```bash
-# Clone the repository
 git clone https://github.com/j1slc/Quester.git
-
-# Install dependencies
+cd Quester
 npm install
-
-# Start development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+افتح [http://localhost:3000](http://localhost:3000).

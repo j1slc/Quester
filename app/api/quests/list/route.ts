@@ -9,7 +9,6 @@ export async function POST(req: Request) {
     }
 
     const quests = await fetchUserQuests(token);
-    console.log(`[DEBUG /api/quests/list] Found ${quests.length} quests:`, quests.map(q => ({ id: q.id, title: q.title, expiresAt: q.expiresAt, isCompleted: q.isCompleted })));
     return NextResponse.json({ success: true, quests });
   } catch (err: any) {
     return NextResponse.json(
