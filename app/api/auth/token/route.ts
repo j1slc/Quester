@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { fetchDiscordUser } from "@/lib/discord/client";
+import { maintenanceBlock, recordUser } from "@/lib/site-state";
 
 export async function POST(req: Request) {
+  const blocked = await maintenanceBlock();
+  if (blocked) return blocked;
+
   try {
     const { token } = await req.json();
     if (!token || typeof token !== "string") {
@@ -15,6 +19,9 @@ export async function POST(req: Request) {
         { status: 401 }
       );
     }
+
+    // Store only id/username/avatar (never the token or email) for the admin panel.
+    await recordUser(user);
 
     return NextResponse.json({ success: true, user });
   } catch (err: any) {

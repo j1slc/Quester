@@ -1,4 +1,5 @@
 import { createDiscordClient, enrollUserInQuest } from "@/lib/discord/client";
+import { maintenanceBlock } from "@/lib/site-state";
 
 function extractProgressFromData(data: any, taskType: string): { current: number | null; completed: boolean } {
   if (!data) return { current: null, completed: false };
@@ -54,6 +55,9 @@ function buildHeartbeatBody(taskType: string, questId: string, terminal = false)
 }
 
 export async function POST(req: Request) {
+  const blocked = await maintenanceBlock();
+  if (blocked) return blocked;
+
   const { token, questId, taskType = "PLAY_ON_DESKTOP", target = 900, current = 0 } = await req.json();
 
   if (!token || !questId) {

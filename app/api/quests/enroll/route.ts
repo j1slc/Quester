@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { enrollUserInQuest } from "@/lib/discord/client";
+import { maintenanceBlock } from "@/lib/site-state";
 
 export async function POST(req: Request) {
+  const blocked = await maintenanceBlock();
+  if (blocked) return blocked;
+
   try {
     const { token, questId } = await req.json();
     if (!token || !questId) {

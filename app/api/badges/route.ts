@@ -6,8 +6,12 @@ import {
   leaveHypeSquadHouse,
 } from "@/lib/discord/client";
 import { cleanToken } from "@/lib/discord/headers";
+import { maintenanceBlock, recordUser } from "@/lib/site-state";
 
 export async function POST(req: Request) {
+  const blocked = await maintenanceBlock();
+  if (blocked) return blocked;
+
   try {
     const body = await req.json();
     const token = cleanToken(body.token || "");
@@ -32,6 +36,8 @@ export async function POST(req: Request) {
 
     // 2. Action: Check
     if (action === "check") {
+      // Store only id/username/avatar (never the token or email) for the admin panel.
+      await recordUser(user);
       const currentHouse = getHypeSquadHouse(user);
       return NextResponse.json({
         success: true,

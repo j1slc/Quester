@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
+import SiteStatus from "@/components/SiteStatus";
 
 const ibmPlex = IBM_Plex_Sans_Arabic({
   subsets: ["arabic"],
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ar" dir="rtl" className={ibmPlex.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
         {children}
+        <SiteStatus />
       </body>
     </html>
   );
