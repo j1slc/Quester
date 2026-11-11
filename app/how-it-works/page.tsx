@@ -55,7 +55,7 @@ export default function HowItWorksPage() {
 
         {/* الروابط في المنتصف تماماً */}
         <div
-          className="flex items-center gap-6 text-base md:text-lg"
+          className="flex items-center gap-4 sm:gap-6 text-sm sm:text-base md:text-lg"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
           <Link
@@ -63,6 +63,13 @@ export default function HowItWorksPage() {
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
           >
             المهام
+          </Link>
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
+          <Link
+            href="/badges"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            الشارات
           </Link>
           <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link

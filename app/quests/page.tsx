@@ -46,6 +46,7 @@ interface ParsedQuest {
 export default function ToolPage() {
   const [token, setToken] = useState<string>("");
   const [showToken, setShowToken] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [loadingAuth, setLoadingAuth] = useState<boolean>(false);
   const [user, setUser] = useState<DiscordUser | null>(null);
   const [quests, setQuests] = useState<ParsedQuest[]>([]);
@@ -72,6 +73,39 @@ export default function ToolPage() {
   const [waitingCountdown, setWaitingCountdown] = useState<number | null>(null);
   const [nextQueuedQuest, setNextQueuedQuest] = useState<ParsedQuest | null>(null);
   const waitingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Quester — المهام";
+  }, []);
+
+  // Lightweight synthesized audio chime for quest completion (0 bytes download, ultra light)
+  const playSuccessChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      // Play a quick cheerful 3-note chime (C5 -> E5 -> G5)
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+        gain.gain.setValueAtTime(0.001, now + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.15, now + idx * 0.12 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.36);
+      });
+    } catch {
+      // Audio not permitted without interaction or unsupported
+    }
+  };
 
   // Clear countdown timer on unmount
   useEffect(() => {
@@ -197,7 +231,11 @@ export default function ToolPage() {
       }
 
       setUser(data.user);
-      localStorage.setItem("quester_token", tokenToUse.trim());
+      if (rememberMe) {
+        localStorage.setItem("quester_token", tokenToUse.trim());
+      } else {
+        localStorage.removeItem("quester_token");
+      }
       addLog(`تم تسجيل الدخول بنجاح بحساب: ${data.user.global_name || data.user.username}`);
 
       // Fetch Quests
@@ -393,6 +431,7 @@ export default function ToolPage() {
           } else if (eventType === "completed") {
             setIsCompleted(true);
             completedQuestIdsRef.current.add(quest.id);
+            playSuccessChime();
             addLog(dataObj.message || "🎉 اكتملت المهمة بنجاح!");
 
             // Mark this quest as completed in local state immediately so it's never selected again
@@ -503,9 +542,16 @@ export default function ToolPage() {
 
         {/* الروابط في المنتصف تماماً */}
         <div
-          className="flex items-center gap-6 text-base md:text-lg"
+          className="flex items-center gap-4 sm:gap-6 text-sm sm:text-base md:text-lg"
           style={{ fontFamily: "'Lifta', sans-serif" }}
         >
+          <Link
+            href="/badges"
+            className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
+          >
+            الشارات
+          </Link>
+          <span className="text-white/30 select-none tracking-widest">─ · ─</span>
           <Link
             href="/how-it-works"
             className="text-white/85 hover:text-white transition-all duration-200 outline-none select-none hover:drop-shadow-[0_0_12px_rgba(255,255,255,0.7)]"
@@ -610,6 +656,20 @@ export default function ToolPage() {
                   />
                 </button>
               </div>
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="mb-4 flex items-center justify-between text-xs text-gray-300 select-none">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-black/40 text-[#5865F2] focus:ring-[#5865F2]/50 accent-[#5865F2] cursor-pointer"
+                />
+                <span className="group-hover:text-white transition-colors">تذكر التوكن في هذا المتصفح</span>
+              </label>
+              <span className="text-[11px] text-gray-500">مشفر محلياً في جهازك</span>
             </div>
 
             {/* Quick guide link */}
@@ -719,8 +779,8 @@ export default function ToolPage() {
                   <button
                     onClick={() => setFilterTab("available")}
                     className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "available"
-                        ? "bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/40"
-                        : "text-gray-400 hover:text-white"
+                      ? "bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/40"
+                      : "text-gray-400 hover:text-white"
                       }`}
                   >
                     <span>المتاحة للبدء</span>
@@ -732,8 +792,8 @@ export default function ToolPage() {
                   <button
                     onClick={() => setFilterTab("completed")}
                     className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "completed"
-                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/40"
-                        : "text-gray-400 hover:text-white"
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/40"
+                      : "text-gray-400 hover:text-white"
                       }`}
                   >
                     <span>المكتملة</span>
@@ -745,8 +805,8 @@ export default function ToolPage() {
                   <button
                     onClick={() => setFilterTab("all")}
                     className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 cursor-pointer select-none ${filterTab === "all"
-                        ? "bg-white/20 text-white"
-                        : "text-gray-400 hover:text-white"
+                      ? "bg-white/20 text-white"
+                      : "text-gray-400 hover:text-white"
                       }`}
                   >
                     <span>الكل</span>
@@ -787,8 +847,8 @@ export default function ToolPage() {
                         key={q.id}
                         onClick={() => handleSelectQuest(q)}
                         className={`relative rounded-3xl p-5 border transition-all duration-300 cursor-pointer overflow-hidden ${isSelected
-                            ? "border-[#5865F2] bg-[#5865F2]/15 shadow-xl shadow-[#5865F2]/20 scale-[1.02]"
-                            : "border-white/10 bg-black/30 hover:border-white/20 hover:bg-white/5"
+                          ? "border-[#5865F2] bg-[#5865F2]/15 shadow-xl shadow-[#5865F2]/20 scale-[1.02]"
+                          : "border-white/10 bg-black/30 hover:border-white/20 hover:bg-white/5"
                           }`}
                       >
                         {/* Top banner / icon */}
@@ -1052,12 +1112,12 @@ export default function ToolPage() {
                         <div
                           key={idx}
                           className={`${l.includes("خطأ") || l.includes("تحذير")
-                              ? "text-red-400"
-                              : l.includes("🎉") || l.includes("مبروك")
-                                ? "text-emerald-400 font-bold"
-                                : l.includes("🚀")
-                                  ? "text-[#7289da] font-semibold"
-                                  : "text-gray-300"
+                            ? "text-red-400"
+                            : l.includes("🎉") || l.includes("مبروك")
+                              ? "text-emerald-400 font-bold"
+                              : l.includes("🚀")
+                                ? "text-[#7289da] font-semibold"
+                                : "text-gray-300"
                             }`}
                         >
                           {l}

@@ -277,3 +277,61 @@ export async function enrollUserInQuest(token: string, questId: string): Promise
 
   return { success: false, alreadyEnrolled: false, error: "تعذر التسجيل في المهمة، يرجى تفعيلها من تطبيق ديسكورد." };
 }
+
+export function getHypeSquadHouse(user: DiscordUser | null): number | null {
+  if (!user) return null;
+  const flags = (user.flags ?? 0) | (user.public_flags ?? 0);
+  if ((flags & 64) === 64) return 1; // Bravery
+  if ((flags & 128) === 128) return 2; // Brilliance
+  if ((flags & 256) === 256) return 3; // Balance
+  return null;
+}
+
+export async function setHypeSquadHouse(
+  token: string,
+  houseId: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const client = createDiscordClient(token);
+    const res = await client.post("/hypesquad/online", {
+      house_id: houseId,
+    });
+    if (res.status === 204 || res.status === 200) {
+      return { success: true };
+    }
+    return { success: false, error: `فشل التعيين (كود: ${res.status})` };
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.message || err.message;
+    if (status === 401) {
+      return { success: false, error: "التوكن غير صالح أو انتهت صلاحيته." };
+    }
+    if (status === 429) {
+      return { success: false, error: "تم تجاوز حد الطلبات في ديسكورد، يرجى الانتظار دقيقة والمحاولة مجدداً." };
+    }
+    return { success: false, error: msg || "فشل الاتصال بسيرفرات ديسكورد." };
+  }
+}
+
+export async function leaveHypeSquadHouse(
+  token: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const client = createDiscordClient(token);
+    const res = await client.delete("/hypesquad/online");
+    if (res.status === 204 || res.status === 200) {
+      return { success: true };
+    }
+    return { success: false, error: `فشل الإزالة (كود: ${res.status})` };
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const msg = err?.response?.data?.message || err.message;
+    if (status === 401) {
+      return { success: false, error: "التوكن غير صالح أو انتهت صلاحيته." };
+    }
+    if (status === 429) {
+      return { success: false, error: "تم تجاوز حد الطلبات في ديسكورد، يرجى الانتظار دقيقة والمحاولة مجدداً." };
+    }
+    return { success: false, error: msg || "فشل الاتصال بسيرفرات ديسكورد." };
+  }
+}
