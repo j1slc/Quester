@@ -32,6 +32,7 @@ export interface StoredUser {
   firstSeen: number;
   lastSeen: number;
   logins: number;
+  questsCompleted: number;
 }
 
 function parseJson<T>(raw: unknown, fallback: T): T {
@@ -128,6 +129,37 @@ export async function recordUser(user: {
       firstSeen: previous?.firstSeen ?? now,
       lastSeen: now,
       logins: (previous?.logins ?? 0) + 1,
+      questsCompleted: previous?.questsCompleted ?? 0,
+    };
+    await redis("HSET", KEY_USERS, user.id, JSON.stringify(record));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// Counts a completed quest for the admin panel. Each quest is counted once per user
+// (tracked in a Redis set), so re-running a finished quest does not inflate the number.
+export async function recordQuestCompleted(
+  user: { id: string; username: string; global_name?: string | null; avatar?: string | null },
+  questId: string
+): Promise<void> {
+  if (!isRedisConfigured() || !user?.id || !questId) return;
+
+  try {
+    const added = await redis("SADD", `quester:done:${user.id}`, questId);
+    if (Number(added) !== 1) return; // already counted
+
+    const now = Date.now();
+    const previous = parseJson<StoredUser | null>(await redis("HGET", KEY_USERS, user.id), null);
+    const record: StoredUser = {
+      id: user.id,
+      username: user.username,
+      globalName: user.global_name ?? null,
+      avatar: user.avatar ?? null,
+      firstSeen: previous?.firstSeen ?? now,
+      lastSeen: previous?.lastSeen ?? now,
+      logins: previous?.logins ?? 0,
+      questsCompleted: (previous?.questsCompleted ?? 0) + 1,
     };
     await redis("HSET", KEY_USERS, user.id, JSON.stringify(record));
   } catch {
@@ -142,7 +174,7 @@ export async function listUsers(limit = 1000): Promise<StoredUser[]> {
   const users: StoredUser[] = [];
   for (let i = 1; i < flat.length; i += 2) {
     const user = parseJson<StoredUser | null>(flat[i], null);
-    if (user?.id) users.push(user);
+    if (user?.id) users.push({ ...user, questsCompleted: user.questsCompleted ?? 0 });
   }
   users.sort((a, b) => b.lastSeen - a.lastSeen);
   return users.slice(0, limit);

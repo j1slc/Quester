@@ -1,5 +1,5 @@
-import { createDiscordClient, enrollUserInQuest } from "@/lib/discord/client";
-import { maintenanceBlock } from "@/lib/site-state";
+import { createDiscordClient, enrollUserInQuest, fetchDiscordUser } from "@/lib/discord/client";
+import { maintenanceBlock, recordQuestCompleted } from "@/lib/site-state";
 
 function extractProgressFromData(data: any, taskType: string): { current: number | null; completed: boolean } {
   if (!data) return { current: null, completed: false };
@@ -227,6 +227,14 @@ export async function POST(req: Request) {
               sendEvent("completed", {
                 message: "🎉 ألف مبروك! اكتملت المهمة بنجاح، وتمت إضافة الجائزة إلى حسابك!",
               });
+
+              // Count it for the admin panel (best effort, only after Discord confirmed it).
+              try {
+                const completedUser = await fetchDiscordUser(token);
+                if (completedUser) await recordQuestCompleted(completedUser, questId);
+              } catch {
+                // ignore
+              }
               break;
             }
           } else {

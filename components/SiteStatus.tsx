@@ -9,7 +9,7 @@ interface SiteStatusData {
 }
 
 // Shows a full-screen maintenance notice or an announcement banner on every public page.
-// The /admin pages are never covered, so the admin can always switch maintenance off.
+// The /adminpan pages are never covered, so the admin can always switch maintenance off.
 export default function SiteStatus() {
   const pathname = usePathname();
   const [status, setStatus] = useState<SiteStatusData | null>(null);
@@ -37,7 +37,7 @@ export default function SiteStatus() {
     };
   }, []);
 
-  if (!status || pathname?.startsWith("/admin")) return null;
+  if (!status || pathname?.startsWith("/adminpan")) return null;
 
   if (status.maintenance.enabled) {
     return (

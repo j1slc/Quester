@@ -10,6 +10,7 @@ interface StoredUser {
   firstSeen: number;
   lastSeen: number;
   logins: number;
+  questsCompleted: number;
 }
 
 interface AdminData {
@@ -253,7 +254,8 @@ export default function AdminPage() {
           />
         </div>
         <p style={{ color: "#aaaaaa", fontSize: 13 }}>
-          يتم تسجيل الـ ID والاسم والصورة فقط عند تسجيل الدخول. لا يتم تخزين التوكنات ولا الإيميلات.
+          يتم تسجيل الـ ID والاسم والصورة وعدد المهام المكتملة فقط. لا يتم تخزين التوكنات ولا الإيميلات.
+          إجمالي المهام المكتملة: {data.users.reduce((sum, u) => sum + (u.questsCompleted ?? 0), 0)}
         </p>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
@@ -264,6 +266,7 @@ export default function AdminPage() {
                 <th style={{ padding: 8 }}>أول ظهور</th>
                 <th style={{ padding: 8 }}>آخر ظهور</th>
                 <th style={{ padding: 8 }}>مرات الدخول</th>
+                <th style={{ padding: 8 }}>المهام المكتملة</th>
               </tr>
             </thead>
             <tbody>
@@ -280,11 +283,12 @@ export default function AdminPage() {
                   <td style={{ padding: 8 }}>{formatDate(u.firstSeen)}</td>
                   <td style={{ padding: 8 }}>{formatDate(u.lastSeen)}</td>
                   <td style={{ padding: 8 }}>{u.logins}</td>
+                  <td style={{ padding: 8, fontWeight: 700 }}>{u.questsCompleted ?? 0}</td>
                 </tr>
               ))}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: 16, textAlign: "center", color: "#aaaaaa" }}>
+                  <td colSpan={6} style={{ padding: 16, textAlign: "center", color: "#aaaaaa" }}>
                     لا يوجد مستخدمون
                   </td>
                 </tr>
