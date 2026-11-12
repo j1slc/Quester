@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 interface SiteStatusData {
   maintenance: { enabled: boolean; message: string };
-  announcement: { enabled: boolean; text: string };
+  announcement: { enabled: boolean; text: string; updatedAt?: number };
 }
+
+// How long the announcement stays on screen before it hides itself.
+const AUTO_HIDE_MS = 10_000;
+const DISMISS_STORAGE_KEY = "quester_dismissed_announcement";
 
 // Shows a full-screen maintenance notice or an announcement banner on every public page.
 // The /adminpan pages are never covered, so the admin can always switch maintenance off.
@@ -14,6 +18,40 @@ export default function SiteStatus() {
   const pathname = usePathname();
   const [status, setStatus] = useState<SiteStatusData | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const [dismissedLoaded, setDismissedLoaded] = useState(false);
+
+  // Identifies one announcement. It changes when the admin edits or re-saves the message,
+  // which makes the banner appear again for people who had closed the previous one.
+  const announcementKey =
+    status?.announcement.enabled && status.announcement.text
+      ? `${status.announcement.updatedAt ?? 0}:${status.announcement.text}`
+      : null;
+
+  const dismiss = useCallback((key: string) => {
+    setDismissed(key);
+    try {
+      localStorage.setItem(DISMISS_STORAGE_KEY, key);
+    } catch {
+      // storage can be blocked; the banner then just comes back on the next visit
+    }
+  }, []);
+
+  // Remember (per browser) which announcement was already closed or timed out.
+  useEffect(() => {
+    try {
+      setDismissed(localStorage.getItem(DISMISS_STORAGE_KEY));
+    } catch {
+      // ignore
+    }
+    setDismissedLoaded(true);
+  }, []);
+
+  // Hide the banner by itself after AUTO_HIDE_MS.
+  useEffect(() => {
+    if (!dismissedLoaded || !announcementKey || announcementKey === dismissed) return;
+    const timer = setTimeout(() => dismiss(announcementKey), AUTO_HIDE_MS);
+    return () => clearTimeout(timer);
+  }, [dismissedLoaded, announcementKey, dismissed, dismiss]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +94,7 @@ export default function SiteStatus() {
   }
 
   const { announcement } = status;
-  if (announcement.enabled && announcement.text && dismissed !== announcement.text) {
+  if (dismissedLoaded && announcementKey && announcementKey !== dismissed) {
     return (
       <div
         role="status"
@@ -67,7 +105,7 @@ export default function SiteStatus() {
         <button
           type="button"
           aria-label="إغلاق"
-          onClick={() => setDismissed(announcement.text)}
+          onClick={() => dismiss(announcementKey)}
           className="text-lg leading-none opacity-80 hover:opacity-100"
         >
           ✕
